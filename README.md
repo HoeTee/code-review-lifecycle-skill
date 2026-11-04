@@ -14,7 +14,7 @@ An Agent Skill for Codex, Claude Code, and OpenCode. Ask for a code review and i
 
 ## Install and try it
 
-Run this in your project with Node.js 20 or newer and Git. List only the agents you use after `--agent`. Add `--global` to install for your user account.
+Run this in your project with Git and Node.js 22.20 or newer, as required by the `skills` installer. List only the agents you use after `--agent`. Add `--global` to install for your user account. [Installer package](https://www.npmjs.com/package/skills)
 
 ```sh
 npx skills add HoeTee/code-review-lifecycle-skill --agent codex claude-code opencode
@@ -28,7 +28,7 @@ npx skills add HoeTee/code-review-lifecycle-skill --agent codex claude-code open
 
 > Use the `code-review-lifecycle` skill to review my changes.
 
-PR and CI operations use your existing repository permissions. The HTML renderer is bundled. [Agent support](references/agent-support.md)
+PR and CI operations use your existing repository permissions. The bundled HTML renderer runs on Node.js 20 or newer. [Agent support](references/agent-support.md)
 
 ## Example review
 
