@@ -81,11 +81,18 @@ HOST、仓库和目标分支由项目事实确定；GitHub.com 的 HOST 是 gith
 
 ## 读取 PR、检查与意见
 
-查询与审查：
+先读取 PR 的目标分支、base 和 head。核对本地 Git 仓库与 PR 的目标仓库一致后，用两个固定提交生成完整差异：
 
 ```sh
 gh pr view NUMBER --repo R --json number,url,state,baseRefName,baseRefOid,headRefName,headRefOid,reviewDecision,statusCheckRollup
-gh pr diff NUMBER --repo R
+git diff --no-ext-diff --no-textconv BASE_SHA...HEAD_SHA --
+```
+
+如果本地缺少对象，从已核对的目标远端获取目标分支和 `refs/pull/NUMBER/head`，再确认原 base 和 head 对象可用。若只能按编号取得平台差异，记录取证前的 base 和 head，执行 `gh pr diff NUMBER --repo R` 后立即再次查询两者。任一 SHA 变化时丢弃该差异，用新 SHA 重新取证。比如作者在查询后推送了新提交，应重新获取差异及对应检查。
+
+读取检查和意见：
+
+```sh
 gh pr checks NUMBER --repo R --required
 gh run view RUN_ID --repo R --log-failed
 gh pr view NUMBER --repo R --comments

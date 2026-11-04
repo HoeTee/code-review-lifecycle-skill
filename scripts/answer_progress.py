@@ -121,6 +121,18 @@ def build_draft(state: dict, state_path: Path) -> str:
         lines.extend([link("打开交付包", delivery), ""])
     elif evidence:
         lines.extend(["交付依据：" + text(evidence), ""])
+    for criterion in state["goal"]["criteria"]:
+        if criterion["id"] == "delivery":
+            continue
+        evidence = criterion.get("evidence")
+        evidence_href = criterion.get("evidence_href")
+        if not evidence and not evidence_href:
+            continue
+        lines.extend([f"**{text(criterion['title'])}**", ""])
+        if evidence:
+            lines.extend([text(evidence), ""])
+        if evidence_href:
+            lines.extend([link("查看证据", evidence_href), ""])
     if state["results"]:
         lines.extend(["| 结果 | 说明 |", "|---|---|"])
         lines.extend(f"| **{text(item['value'])}** | {text(item['label'])} |" for item in state["results"])

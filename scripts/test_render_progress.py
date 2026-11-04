@@ -1,5 +1,6 @@
 """Check progress-state invariants that prevent misleading user actions."""
 from copy import deepcopy
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
@@ -18,6 +19,8 @@ EXAMPLE = Path(__file__).resolve().parents[1] / "assets/progress.example.json"
 SHOWCASE = Path(__file__).resolve().parents[1] / "docs/showcase/export-review.md"
 SCRIPTS = Path(__file__).resolve().parent
 PROJECT_URL = "https://github.com/HoeTee/code-review-lifecycle-skill"
+RENDERER = SCRIPTS / "vendor/answer-me-with-html/am.mjs"
+UPSTREAM_RENDERER_SHA256 = "5e08fda8e976927b16596624cf605e5aadd77828ee690a412b5a9a96584d4f2c"
 
 
 class ProgressStateTests(unittest.TestCase):
@@ -165,25 +168,73 @@ class ProgressStateTests(unittest.TestCase):
             page = output.read_text(encoding="utf-8")
             self.assertTrue('<meta name="generator" content="Answer me with HTML' in page, "Expected the bundled renderer")
             self.assertTrue(self.state["project"] in page, "The rendered progress page is missing the project name")
+            evidence_panel = page.split('id="panel-D"', 1)[1].split("</section>", 1)[0]
+            self.assertIn(self.state["goal"]["criteria"][0]["evidence"], evidence_panel)
 
     @unittest.skipUnless(shutil.which("node"), "Node.js is needed for the bundled renderer")
-    def test_readme_example_links_to_this_project(self):
+    def test_progress_cli_displays_review_evidence_and_its_link(self):
         with TemporaryDirectory() as directory:
-            output = Path(directory) / "review.html"
+            workdir = Path(directory)
+            state_path = workdir / "state.json"
+            output = workdir / "progress.html"
+            criterion = self.state["goal"]["criteria"][0]
+            criterion["evidence_href"] = "https://example.com/review-evidence"
+            state_path.write_text(json.dumps(self.state), encoding="utf-8")
             self.run_render(
-                "node", str(SCRIPTS / "render_html.mjs"), "render", str(SHOWCASE),
-                "-o", str(output), "--no-open",
-                workdir=Path(directory),
+                sys.executable, "-B", str(SCRIPTS / "render_progress.py"),
+                str(state_path), "--output", str(output), workdir=workdir,
+            )
+            page = output.read_text(encoding="utf-8")
+            evidence_panel = page.split('id="panel-D"', 1)[1].split("</section>", 1)[0]
+            self.assertIn(criterion["title"], evidence_panel)
+            self.assertIn(criterion["evidence"], evidence_panel)
+            self.assertIn('href="https://example.com/review-evidence"', evidence_panel)
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js is needed for the bundled renderer")
+    def test_readme_example_keeps_project_links_after_a_panel_patch(self):
+        with TemporaryDirectory() as directory:
+            workdir = Path(directory)
+            output = workdir / "review.html"
+            cli = ("node", str(SCRIPTS / "render_html.mjs"))
+            self.run_render(
+                *cli, "render", str(SHOWCASE), "-o", str(output), "--no-open", workdir=workdir,
             )
             page = output.read_text(encoding="utf-8")
             self.assertTrue("<title>CSV export access review</title>" in page, "Expected the README example title")
-            credit = page.split('<p class="am-colophon">', 1)[1].split("</p>", 1)[0]
-            self.assertIn(">code-review-lifecycle-skill</a>", credit)
-            self.assertIn(">★ Star on GitHub</a>", credit)
-            self.assertEqual(credit.count(f'href="{PROJECT_URL}"'), 2)
+            self.assert_project_credit(page)
+
+            panel = workdir / "decision.md"
+            panel.write_text("## D Human decision {span=2}\n\nThe reviewer approved the failure message.\n", encoding="utf-8")
+            self.run_render(
+                *cli, "patch", str(output), "--panel", "D", "--from", str(panel), "--no-open",
+                workdir=workdir,
+            )
+            page = output.read_text(encoding="utf-8")
+            visible = page.split('<textarea id="am-source"', 1)[0]
+            self.assertIn("The reviewer approved the failure message.", visible)
+            self.assertNotIn("Check the failure message", visible)
+            self.assert_project_credit(page)
+
+    def assert_project_credit(self, page: str):
+        credit = page.split('<p class="am-colophon">', 1)[1].split("</p>", 1)[0]
+        self.assertIn(">code-review-lifecycle-skill</a>", credit)
+        self.assertIn(">★ Star on GitHub</a>", credit)
+        self.assertEqual(credit.count(f'href="{PROJECT_URL}"'), 2)
+
+    def test_renderer_bundle_matches_upstream_except_for_project_credit(self):
+        bundle = RENDERER.read_bytes()
+        branding = (
+            (f'  const repo = "{PROJECT_URL}";'.encode("utf-8"),
+             b'  const repo = "https://github.com/QingYunA/answer-me-with-html";'),
+            (b'>code-review-lifecycle-skill</a>`;', b'>Answer me with HTML</a>`;'),
+        )
+        for project_text, upstream_text in branding:
+            self.assertEqual(bundle.count(project_text), 1)
+            bundle = bundle.replace(project_text, upstream_text)
+        self.assertEqual(sha256(bundle).hexdigest(), UPSTREAM_RENDERER_SHA256)
 
     def test_renderer_bundle_contains_the_font(self):
-        bundle = (SCRIPTS / "vendor/answer-me-with-html/am.mjs").read_text(encoding="utf-8")
+        bundle = RENDERER.read_text(encoding="utf-8")
         self.assertTrue(
             'font-family: "Bangers";' in bundle and "data:font/woff2;base64," in bundle,
             "The renderer must include the bundled Bangers font",

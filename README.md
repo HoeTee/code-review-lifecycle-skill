@@ -86,7 +86,7 @@ The skill instructions, templates, and reference guides are mainly in Chinese. T
 python scripts/render_progress.py assets/progress.example.json --output progress-example.html
 ```
 
-Run `python -B -m unittest discover -s scripts -v` to test the progress state and HTML rendering locally. GitHub Actions runs the same suite for pull requests and pushes to `main`.
+Run `python -B -m unittest discover -s scripts -v` to check progress evidence, HTML rendering and panel updates, and the integrity of the bundled renderer. GitHub Actions runs the same suite for pull requests and pushes to `main`.
 
 ## License
 
