@@ -2,10 +2,13 @@
 from copy import deepcopy
 import json
 from pathlib import Path
+import shutil
+from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from render_progress import render, validate
-from answer_progress import build_draft
+from answer_progress import build_draft, render_answer_progress
 
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "assets/progress.example.json"
@@ -120,6 +123,33 @@ class ProgressStateTests(unittest.TestCase):
         action["kind"] = "untyped_approval"
         with self.assertRaises(ValueError):
             validate(self.state)
+
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js is needed for the bundled renderer")
+    def test_default_renderer_works_without_a_separate_skill_installation(self):
+        with TemporaryDirectory() as directory:
+            clean_home = Path(directory)
+            output = clean_home / "progress.html"
+            with patch.object(Path, "home", return_value=clean_home), patch.dict(
+                "os.environ", {"AM_HOME": str(clean_home / "renderer")}
+            ):
+                render_answer_progress(self.state, EXAMPLE, output)
+            page = output.read_text(encoding="utf-8")
+            self.assertTrue('<meta name="generator" content="Answer me with HTML' in page)
+            self.assertTrue(self.state["project"] in page)
+
+    def test_explicit_renderer_path_remains_supported(self):
+        with TemporaryDirectory() as directory:
+            workdir = Path(directory)
+            custom_cli = workdir / "custom-renderer.mjs"
+            custom_cli.touch()
+            output = workdir / "progress.html"
+            self.state["presentation"] = {"am_cli": str(custom_cli)}
+            with patch("answer_progress.shutil.which", return_value="node"), patch(
+                "answer_progress.subprocess.run"
+            ) as run:
+                render_answer_progress(self.state, EXAMPLE, output)
+            self.assertEqual(run.call_args.args[0][1], str(custom_cli))
 
 
 if __name__ == "__main__":

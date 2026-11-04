@@ -2,7 +2,7 @@
 
 [Simplified Chinese](docs/README.zh-CN.md) · [Japanese](docs/README.ja.md)
 
-**A Codex skill for reviewing pull requests and delivering changes.**
+**A skill for reviewing pull requests and delivering changes with Codex, Claude Code, and OpenCode.**
 
 AI finds issues and rechecks fixes. A human reviewer gets a short brief with what changed, which checks ran, and what still needs a decision. Start with an existing PR or follow a change from acceptance criteria through delivery.
 
@@ -10,22 +10,28 @@ AI finds issues and rechecks fixes. A human reviewer gets a short brief with wha
 
 ## Install and try it
 
-Run this from the target project directory with Node.js, `npx`, and Git installed. Add `--global` to install for your user account.
+Run this from the target project with Node.js 20 or newer and Git. List only the agents you use after `--agent`. Add `--global` to install for your user account.
 
 ```sh
-npx skills add HoeTee/code-review-lifecycle-skill --agent codex
+npx skills add HoeTee/code-review-lifecycle-skill --agent codex claude-code opencode
 ```
 
-**Try it on an existing PR.** Paste this prompt into Codex.
+| Agent | How to start |
+| --- | --- |
+| Codex | Invoke `$code-review-lifecycle`. |
+| Claude Code | Run `/code-review-lifecycle` followed by your request. |
+| OpenCode | Ask OpenCode to load the `code-review-lifecycle` skill and describe your task. |
 
-> Use `$code-review-lifecycle` to review this PR. Show me the findings, checks for the current revision, and decisions I need to make before merging.
+**Try it on an existing PR.**
+
+> Use the `code-review-lifecycle` skill to review this PR. Show me the findings, checks for the current revision, and decisions I need to make before merging.
 
 **Other ways to start**
 
-- **Set up a project.** “Use `$code-review-lifecycle` to propose local checks, CI requirements, and review rules for this repository. Start from our existing project instructions.”
-- **Investigate a regression.** “Use `$code-review-lifecycle` to compare these logs with the deployed revision and propose a fix and a way to verify it.”
+- **Set up a project.** “Use the `code-review-lifecycle` skill to propose local checks, CI requirements, and review rules for this repository. Start from our existing project instructions.”
+- **Investigate a regression.** “Use the `code-review-lifecycle` skill to compare these logs with the deployed revision and propose a fix and a way to verify it.”
 
-PR and CI actions require repository access and the relevant permissions. Platform guides cover GitHub and Gitee. Default HTML explainers use a separately installed skill. [GitHub guide](references/platforms/github.md) · [Gitee guide](references/platforms/gitee.md) · [HTML renderer installation](https://github.com/QingYunA/answer-me-with-html#install)
+PR and CI actions require repository access and the relevant permissions. Platform guides cover GitHub and Gitee. HTML explainers use the bundled Answer me with HTML renderer. [Agent support](references/agent-support.md) · [GitHub guide](references/platforms/github.md) · [Gitee guide](references/platforms/gitee.md) · [Renderer source and licenses](scripts/vendor/answer-me-with-html/README.md)
 
 ## Example review
 
@@ -67,12 +73,12 @@ Start with the project’s existing `AGENTS.md`, `CLAUDE.md`, or other working i
 
 | If you want to… | Start here |
 | --- | --- |
-| See what Codex reads and how it selects a stage | [SKILL.md](SKILL.md) |
+| See what the agent reads and how it selects a stage | [SKILL.md](SKILL.md) |
 | Design local and CI checks for a real behavior change | [Verification guide](references/verification.md) |
 | Track a rollout or investigate a failure after merge | [Delivery and recovery guide](references/delivery-recovery.md) |
 | Inspect the progress data or maintain the workflow | [Example progress data](assets/progress.example.json) · [Validation scenarios](references/validation-scenarios.md) |
 
-The skill instructions, templates, and reference guides are mainly in Chinese. To preview the bundled local progress example, run the following from this repository with Python 3 and the HTML renderer installed.
+The skill instructions, templates, and reference guides are mainly in Chinese. To preview the bundled local progress example, run the following from this repository with Python 3 and Node.js 20 or newer.
 
 ```sh
 python scripts/render_progress.py assets/progress.example.json --output progress-example.html

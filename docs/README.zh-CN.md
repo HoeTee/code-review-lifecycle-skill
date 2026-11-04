@@ -2,7 +2,7 @@
 
 [English](../README.md) · 简体中文 · [日本語](README.ja.md)
 
-**面向 Codex 的 PR 审查与交付 skill。**
+**面向 Codex、Claude Code 和 OpenCode 的 PR 审查与交付 skill。**
 
 AI 找出问题并复核修复。审核人拿到一份简明说明，能看到改动了什么、跑过哪些检查、还需要决定什么。可以从已有 PR 开始，也可以从验收标准、本地验证一路走到合并和交付。
 
@@ -10,7 +10,7 @@ AI 找出问题并复核修复。审核人拿到一份简明说明，能看到�
 
 ## 安装与试用
 
-安装后，可以在 Codex 中说“用 `$code-review-lifecycle` 审查这个 PR，告诉我当前提交验证了什么，还有哪些事项需要我在合并前决定。”默认 HTML 说明页需要单独安装渲染 skill。 [安装与试用](../README.md#install-and-try-it) · [HTML 渲染器](https://github.com/QingYunA/answer-me-with-html#install)
+Codex 用 `$code-review-lifecycle`。Claude Code 用 `/code-review-lifecycle`。在 OpenCode 中，请它加载 `code-review-lifecycle` skill，再说明任务。例如，审查当前 PR，说明实际验证结果和合并前待决定事项。HTML 渲染器随包提供，需要 Node.js 20 或更新版本。 [安装与试用](../README.md#install-and-try-it) · [Agent 支持](../references/agent-support.md)
 
 ## 审查流程
 
