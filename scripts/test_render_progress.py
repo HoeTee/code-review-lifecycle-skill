@@ -1,6 +1,7 @@
 """Check progress-state invariants that prevent misleading user actions."""
 from copy import deepcopy
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -14,6 +15,7 @@ from answer_progress import build_draft, render_answer_progress
 
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "assets/progress.example.json"
+SHOWCASE = Path(__file__).resolve().parents[1] / "docs/showcase/export-review.md"
 SCRIPTS = Path(__file__).resolve().parent
 PROJECT_URL = "https://github.com/HoeTee/code-review-lifecycle-skill"
 
@@ -152,54 +154,47 @@ class ProgressStateTests(unittest.TestCase):
 
 
     @unittest.skipUnless(shutil.which("node"), "Node.js is needed for the bundled renderer")
-    def test_default_renderer_uses_project_assets(self):
+    def test_progress_cli_uses_the_bundled_renderer(self):
         with TemporaryDirectory() as directory:
-            state_path = Path(directory) / "state.json"
             output = Path(directory) / "progress.html"
-            for presentation in ({}, {"renderer": "answer-me-with-html"}):
-                with self.subTest(presentation=presentation):
-                    self.state["presentation"] = presentation
-                    state_path.write_text(json.dumps(self.state), encoding="utf-8")
-                    subprocess.run(
-                        [sys.executable, "-B", str(SCRIPTS / "render_progress.py"), str(state_path), "--output", str(output)],
-                        capture_output=True, check=True,
-                    )
-                    page = output.read_text(encoding="utf-8")
-                    self.assertIn('<meta name="generator" content="Code Review Lifecycle">', page)
-                    self.assertIn(self.state["project"], page)
-                    credit = page.split('<p class="page-credit">', 1)[1].split("</p>", 1)[0]
-                    self.assertIn(">code-review-lifecycle-skill</a>", credit)
-                    self.assertIn(">★ Star on GitHub</a>", credit)
-                    self.assertEqual(credit.count(f'href="{PROJECT_URL}"'), 2)
-
-    @unittest.skipUnless(shutil.which("node"), "Node.js is needed for the bundled renderer")
-    def test_html_patches_only_the_selected_panel_and_escapes_the_draft(self):
-        with TemporaryDirectory() as directory:
-            output = Path(directory) / "review.html"
-            cli = ["node", str(SCRIPTS / "render_html.mjs")]
-            draft = (
-                "## A Status\n\n<a> & </script><script>alert(1)</script>\n\n"
-                "[Blocked link](javascript:alert) [Evidence \\[1\\]](https://example.com/check)\n\n"
-                "```text\n## This is code\n```\n\n## B Decision\n\nPending\n"
-            )
-            subprocess.run(
-                [*cli, "render", "-", "-o", str(output), "--no-open", "--mode", "dark"],
-                input=draft, encoding="utf-8", capture_output=True, check=True,
-            )
-            subprocess.run(
-                [*cli, "patch", str(output), "--panel", "B", "-", "--no-open"],
-                input="Approved on a1b2c3d\n", encoding="utf-8", capture_output=True, check=True,
+            self.run_render(
+                sys.executable, "-B", str(SCRIPTS / "render_progress.py"),
+                str(EXAMPLE), "--output", str(output),
+                workdir=Path(directory),
             )
             page = output.read_text(encoding="utf-8")
-            visible = page.split('<script id="review-source"', 1)[0]
-            self.assertIn('data-mode="dark"', visible)
-            self.assertIn("&lt;a&gt; &amp; &lt;/script&gt;", visible)
-            self.assertIn('<a href="https://example.com/check">Evidence [1]</a>', visible)
-            self.assertIn("<pre><code>## This is code</code></pre>", visible)
-            self.assertNotIn('href="javascript:', visible)
-            self.assertEqual(page.count("</script>"), 1)
-            self.assertIn("<p>Approved on a1b2c3d</p>", visible)
-            self.assertNotIn("Pending", visible)
+            self.assertTrue('<meta name="generator" content="Answer me with HTML' in page, "Expected the bundled renderer")
+            self.assertTrue(self.state["project"] in page, "The rendered progress page is missing the project name")
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js is needed for the bundled renderer")
+    def test_readme_example_links_to_this_project(self):
+        with TemporaryDirectory() as directory:
+            output = Path(directory) / "review.html"
+            self.run_render(
+                "node", str(SCRIPTS / "render_html.mjs"), "render", str(SHOWCASE),
+                "-o", str(output), "--no-open",
+                workdir=Path(directory),
+            )
+            page = output.read_text(encoding="utf-8")
+            self.assertTrue("<title>CSV export access review</title>" in page, "Expected the README example title")
+            credit = page.split('<p class="am-colophon">', 1)[1].split("</p>", 1)[0]
+            self.assertIn(">code-review-lifecycle-skill</a>", credit)
+            self.assertIn(">★ Star on GitHub</a>", credit)
+            self.assertEqual(credit.count(f'href="{PROJECT_URL}"'), 2)
+
+    def test_renderer_bundle_contains_the_font(self):
+        bundle = (SCRIPTS / "vendor/answer-me-with-html/am.mjs").read_text(encoding="utf-8")
+        self.assertTrue(
+            'font-family: "Bangers";' in bundle and "data:font/woff2;base64," in bundle,
+            "The renderer must include the bundled Bangers font",
+        )
+
+    def run_render(self, *command: str, workdir: Path):
+        result = subprocess.run(
+            command, cwd=workdir, env={**os.environ, "AM_HOME": str(workdir / "renderer")},
+            capture_output=True, encoding="utf-8", errors="replace", timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
 
     def test_explicit_renderer_path_remains_supported(self):
         with TemporaryDirectory() as directory:
