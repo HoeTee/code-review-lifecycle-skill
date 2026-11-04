@@ -4,9 +4,25 @@
 
 **A Codex skill for reviewing and delivering code changes.** Start with acceptance criteria, verify the change locally and in CI, then give a human reviewer the evidence to make a merge decision. Use the full workflow or start with the stage you need.
 
-[Example review](#example-review) · [Workflow](#workflow) · [Install](#install-and-try-it) · [Repository guide](#repository-guide)
+[Install](#install-and-try-it) · [Example review](#example-review) · [Workflow](#workflow) · [Repository guide](#repository-guide)
 
 The workflow draws on the Claude Code team’s practices for reviewing early, limiting review rounds, and explaining the code a person needs to understand. This skill uses those practices to prepare a final human review tied to a specific PR and commit. [How the Claude Code team does code review](https://claude.dev/blog/solving-code-review-at-anthropic/)
+
+## Install and try it
+
+Run this from the target project directory with Node.js, `npx`, and Git installed. Add `--global` to install for your user account.
+
+```sh
+npx skills add HoeTee/code-review-lifecycle-skill --agent codex
+```
+
+In Codex, pick the starting point that matches your task.
+
+- **Review an existing PR.** “Use `$code-review-lifecycle` to review this PR. Show me the findings, checks for the current revision, and decisions I need to make before merge.”
+- **Set up a project.** “Use `$code-review-lifecycle` to propose local checks, CI requirements, and review rules for this repository. Start from our existing project instructions.”
+- **Investigate a regression.** “Use `$code-review-lifecycle` to compare these logs with the deployed revision and propose a fix and a way to verify it.”
+
+PR and CI actions require repository access and the relevant permissions. Platform guides cover GitHub and Gitee. Default HTML explainers use a separately installed skill. [GitHub guide](references/platforms/github.md) · [Gitee guide](references/platforms/gitee.md) · [HTML renderer installation](https://github.com/QingYunA/answer-me-with-html#install)
 
 ## Example review
 
@@ -39,22 +55,6 @@ The default is **up to three completed AI review rounds per PR**. End the cycle 
 The review brief starts with the decisions the reviewer needs to make. Show the intended behavior, what changed, and the key code excerpts with a link to the full diff. Include the checks that ran, their results, how AI findings were handled, and the risks the checks leave open.
 
 The reviewer explicitly approves, requests changes, or defers. Record the decision against the PR and reviewed commit. If a later commit changes the basis for the decision, verify and review the affected parts again. The repository’s rules determine who can provide any required platform approval. [Human review and evidence guide](references/human-review.md)
-
-## Install and try it
-
-Run this from the target project directory with Node.js, `npx`, and Git installed. Add `--global` to install for your user account.
-
-```sh
-npx skills add HoeTee/code-review-lifecycle-skill --agent codex
-```
-
-In Codex, pick the starting point that matches your task.
-
-- **Review an existing PR.** “Use `$code-review-lifecycle` to review this PR. Show me the findings, checks for the current revision, and decisions I need to make before merge.”
-- **Set up a project.** “Use `$code-review-lifecycle` to propose local checks, CI requirements, and review rules for this repository. Start from our existing project instructions.”
-- **Investigate a regression.** “Use `$code-review-lifecycle` to compare these logs with the deployed revision and propose a fix and a way to verify it.”
-
-PR and CI actions require repository access and the relevant permissions. Platform guides cover GitHub and Gitee. Default HTML explainers use a separately installed skill. [GitHub guide](references/platforms/github.md) · [Gitee guide](references/platforms/gitee.md) · [HTML renderer installation](https://github.com/QingYunA/answer-me-with-html#install)
 
 ## Repository guide
 
