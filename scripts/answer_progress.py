@@ -146,12 +146,12 @@ def build_draft(state: dict, state_path: Path) -> str:
 def render_answer_progress(state: dict, state_path: Path, output: Path) -> None:
     view = state.get("presentation", {})
     explicit = view.get("am_cli")
-    candidates = [Path(explicit)] if explicit else [
-        Path.home() / root / "skills/answer-me-with-html/scripts/am.mjs" for root in (".agents", ".codex")]
-    cli = next((path for path in candidates if path.is_file()), None)
+    cli = Path(explicit) if explicit else Path(__file__).resolve().with_name("render_html.mjs")
+    if not cli.is_file():
+        raise ValueError(f"HTML renderer not found: {cli}")
     node = shutil.which("node")
-    if cli is None or node is None:
-        raise ValueError("Selected answer-me-with-html renderer needs its installed am.mjs and Node.js; no native-style fallback was used")
+    if node is None:
+        raise ValueError("HTML rendering requires Node.js 20 or newer")
     draft = build_draft(state, state_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     draft_path = output.with_suffix(".view.md")
