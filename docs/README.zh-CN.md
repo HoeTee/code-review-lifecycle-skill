@@ -2,15 +2,15 @@
 
 [English](../README.md) · 简体中文 · [日本語](README.ja.md)
 
-**面向 Codex、Claude Code 和 OpenCode 的 PR 审查与交付 skill。**
+**面向 Codex、Claude Code 和 OpenCode 的代码审查 skill。**
 
-AI 找出问题并复核修复。审核人拿到一份简明说明，能看到改动了什么、跑过哪些检查、还需要决定什么。可以从已有 PR 开始，也可以从验收标准、本地验证一路走到合并和交付。
+只需说「做下 code review」。Agent 先读适用的 `CLAUDE.md` 和 `REVIEW.md`，再识别本地改动或已有 PR。审查结果列出问题、验证证据和待人工决定项。
 
 流程参考了 Claude Code 团队的早期审查、审查轮次上限和关键代码解释做法。 [Claude Code 团队的代码审查实践](https://claude.dev/blog/solving-code-review-at-anthropic/)
 
 ## 安装与试用
 
-Codex 用 `$code-review-lifecycle`。Claude Code 用 `/code-review-lifecycle`。在 OpenCode 中，请它加载 `code-review-lifecycle` skill，再说明任务。例如，审查当前 PR，说明实际验证结果和合并前待决定事项。HTML 渲染器随包提供，需要 Node.js 20 或更新版本。 [安装与试用](../README.md#install-and-try-it) · [Agent 支持](../references/agent-support.md)
+Codex 用 `$code-review-lifecycle`。Claude Code 用 `/code-review-lifecycle`。在 OpenCode 中，请它加载 `code-review-lifecycle` skill，再说明任务。例如，请它审查当前改动。HTML 渲染器随包提供，需要 Node.js 20 或更新版本。 [安装与试用](../README.md#install-and-try-it) · [Agent 支持](../references/agent-support.md)
 
 ## 审查流程
 

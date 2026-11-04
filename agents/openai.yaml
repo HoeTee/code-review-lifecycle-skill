@@ -1,3 +1,3 @@
 interface:
   display_name: "Code Review Lifecycle"
-  short_description: "按场景建立并执行 PR 前、中、后的验证、审查、部署与故障修复流程"
+  short_description: "自动定位本地改动或 PR，核对代码、验证证据和人工审核事项"

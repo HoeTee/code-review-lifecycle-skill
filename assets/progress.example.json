@@ -1,26 +1,57 @@
 {
   "task_id": "example-local-review",
-  "project": "示例项目",
-  "title": "示例：本地准备完成",
-  "scope": "示例数据，使用前替换为当前任务事实",
+  "project": "代码审查示例",
+  "title": "本地差异审查结果",
+  "scope": "示例数据。审查本地候选版本中的权限检查改动。",
   "status": "completed",
   "goal": {
-    "mode": "scoped",
-    "description": "示例：用户明确只要求本地配置检查",
-    "scope_confirmation": "示例用户指令：只检查本地配置，不接入平台。",
-    "criteria": [{"id": "local_check", "title": "本地配置检查", "status": "passed", "evidence": "示例占位，需替换为实际记录"}]
+    "mode": "review",
+    "description": "核对本地候选版本的行为与验证证据。",
+    "criteria": [
+      {
+        "id": "local_check",
+        "title": "本地差异与检查",
+        "status": "passed",
+        "evidence": "示例记录：权限检查用例通过。"
+      }
+    ]
   },
-  "phase": "pre_pr",
+  "phase": "review",
   "updated_at": "2026-01-01T12:00:00+08:00",
-  "source_commit": "未绑定实际提交",
-  "current_action": "示例任务已结束，没有后台工作运行。",
+  "source_commit": "a1b2c3d",
+  "current_action": "已核对本地差异与相关验证证据。",
   "user_message": "暂时无需操作。",
   "user_actions": [],
-  "next_step": {"owner": "Agent", "text": "下一步由实际任务确定。", "kind": "proposal", "instruction": ""},
+  "next_step": {
+    "owner": "Agent",
+    "text": "审查结果已整理。",
+    "kind": "none",
+    "instruction": ""
+  },
   "phases": [
-    {"id": "pre_pr", "label": "PR 前", "status": "completed", "note": "仅本轮本地范围"},
-    {"id": "in_pr", "label": "PR 中", "status": "not_started", "note": "尚未创建 PR"},
-    {"id": "post_pr", "label": "PR 后", "status": "not_started", "note": "尚未交付"}
+    {
+      "id": "prepare",
+      "label": "确定审查范围",
+      "status": "completed",
+      "note": "本地候选版本"
+    },
+    {
+      "id": "review",
+      "label": "审查与验证",
+      "status": "completed",
+      "note": "核对差异和验证结果"
+    },
+    {
+      "id": "human_review",
+      "label": "人工审核",
+      "status": "not_started",
+      "note": "此示例仅展示本地审查结果"
+    }
   ],
-  "results": [], "issues": [], "checks": [], "files": [], "history": [], "links": []
+  "results": [],
+  "issues": [],
+  "checks": [],
+  "files": [],
+  "history": [],
+  "links": []
 }

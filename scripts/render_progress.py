@@ -9,7 +9,8 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 STATUSES = {"running", "waiting_user", "blocked", "failed", "not_started", "completed"}
-PHASES = {"pre_pr", "in_pr", "post_pr"}
+REVIEW_PHASES = {"prepare", "review", "human_review"}
+LEGACY_PHASES = {"pre_pr", "in_pr", "post_pr"}
 TEMPLATE = Path(__file__).resolve().parents[1] / "assets" / "progress.html"
 
 
@@ -24,10 +25,10 @@ def validate(state: dict) -> None:
         if not isinstance(state.get(field), str) or not state[field].strip():
             raise ValueError(f"Missing nonempty text field: {field}")
     timestamp(state["updated_at"])
-    if state.get("status") not in STATUSES or state.get("phase") not in PHASES:
-        raise ValueError("Invalid task status or phase")
+    if state.get("status") not in STATUSES:
+        raise ValueError("Invalid task status")
     goal = state.get("goal", {})
-    if goal.get("mode") not in {"end_to_end", "scoped"} or not goal.get("description"):
+    if goal.get("mode") not in {"review", "end_to_end", "scoped"} or not goal.get("description"):
         raise ValueError("Record the user's overall goal and its mode")
     if goal["mode"] == "scoped" and not goal.get("scope_confirmation"):
         raise ValueError("A narrowed scope requires an explicit user instruction")
@@ -55,8 +56,10 @@ def validate(state: dict) -> None:
             raise ValueError("User actions need question, recommendation and impact")
         if not any(isinstance(action.get(key), str) and action[key].strip() for key in ("instruction", "reply_hint")):
             raise ValueError("User actions need a concrete instruction or direct-reply hint")
-    if {item.get("id") for item in state["phases"]} != PHASES or len(state["phases"]) != 3:
-        raise ValueError("Provide the three distinct PR phases")
+    phase_ids = {item.get("id") for item in state["phases"]}
+    if (phase_ids not in (REVIEW_PHASES, LEGACY_PHASES) or len(state["phases"]) != 3
+            or state.get("phase") not in phase_ids):
+        raise ValueError("Provide the three distinct phases and a matching active phase")
     for item in state["phases"]:
         if item.get("status") not in STATUSES:
             raise ValueError("Invalid phase status")

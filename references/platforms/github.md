@@ -79,17 +79,7 @@ HOST、仓库和目标分支由项目事实确定；GitHub.com 的 HOST 是 gith
 
 版本与认证命令适用于 Windows 和 Linux；占位符按实际平台填写。
 
-## 只执行当前需要的操作
-
-先核对本地仓库与分支，推送属于授权写操作：
-
-```sh
-git status --short
-git remote -v
-git branch --show-current
-git rev-parse HEAD
-git push -u REMOTE FEATURE_BRANCH
-```
+## 读取 PR、检查与意见
 
 查询与审查：
 
@@ -115,41 +105,12 @@ gh api graphql --hostname HOST --paginate -F owner=OWNER -F repo=REPO -F number=
 必需检查未设置或结果列表为空，不等于自动满足项目验证清单。
 有等待中的任务按任务状态等待或回报，不通过无限重跑消耗轮次。
 
-以下写操作仅在对应任务已授权时执行。多行正文由 Agent 写进 UTF-8 文件，再通过 --body-file 传入，避免 shell 转义错误：
+经授权发布技术意见时，将正文写入 UTF-8 文件后使用：
 
 ```sh
-gh pr create --repo R --base BASE_BRANCH --head FEATURE_BRANCH --title "TITLE" --body-file BODY_FILE
-gh pr edit NUMBER --repo R --body-file BODY_FILE
 gh pr comment NUMBER --repo R --body-file REVIEW_FILE
 ```
 
-AI 意见发布为明确标注的技术意见。代记用户验收要标明来源与 commit，不能冒充用户 Approve。
-真实有资格的人按平台完成要求的审批；已有分支规则必须满足。
-所有门槛与合并授权具备后，再读取当前 head，以实际仓库策略选择 merge、squash 或 rebase。
-例如项目选择 squash 时：
+标明技术意见来源和受审版本。读取当前合并门槛和审批状态；要求人工审批时由有资格的人在平台完成。
 
-```sh
-gh pr merge NUMBER --repo R --squash --match-head-commit REVIEWED_HEAD_SHA
-gh pr view NUMBER --repo R --json state,mergedAt,mergeCommit
-```
-
-不要使用 --admin 绕过门槛，也不要默认删除分支。
-进入合并队列等异步路径时回读实际状态，不能因命令返回就宣称已合并。
-
-## 需要配置 CI 时
-
-先复用项目已有 CI。
-采用 Actions 时，编辑 `.github/workflows/*.yml`，使用项目已登记检查、依赖和实际命令；在授权范围提交并推送。
-不把此 skill 的格式校验或示例脚本测试当成业务 CI。
-实际执行成功后核对检查名称与必需状态，另行验证对应分支规则确实生效。
-使用已选定的连接器或 `gh` 读取实际运行和失败日志。
-只有需要自托管 runner 时，才按其手册准备执行器。
-具体测试命令来自项目验证清单，不在本平台手册写死。
-
-官方参考：
-- https://github.com/cli/cli/blob/trunk/docs/install_windows.md
-- https://cli.github.com/manual/gh_auth_login
-- https://cli.github.com/manual/gh_pr
-- https://docs.github.com/en/actions/tutorials/build-and-test-code/python
-
-补充参考：[gh api](https://cli.github.com/manual/gh_api)、[PR view](https://cli.github.com/manual/gh_pr_view)、[merge](https://cli.github.com/manual/gh_pr_merge)。
+官方参考：[gh api](https://cli.github.com/manual/gh_api) · [gh pr view](https://cli.github.com/manual/gh_pr_view) · [gh pr diff](https://cli.github.com/manual/gh_pr_diff)。

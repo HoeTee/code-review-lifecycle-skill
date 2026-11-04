@@ -11,7 +11,8 @@ from urllib.parse import quote, urlparse
 
 LABELS = {"running": "正在执行", "waiting_user": "等待所需结果或决定", "blocked": "遇到阻断",
           "failed": "执行失败", "not_started": "尚未开始", "completed": "已完成"}
-PHASE_LABELS = {"pre_pr": "PR 前", "in_pr": "PR 中", "post_pr": "PR 后"}
+PHASE_LABELS = {"prepare": "确定审查范围", "review": "审查与验证", "human_review": "人工审核",
+                "pre_pr": "PR 前", "in_pr": "PR 中", "post_pr": "PR 后"}
 ACTION_LABELS = {"technical_replan": "三轮后的方案决策", "final_review": "合并前最终人工审核",
                  "target_acceptance": "真实环境验收结果", "missing_information": "缺少必要信息"}
 
@@ -105,12 +106,12 @@ def build_draft(state: dict, state_path: Path) -> str:
     else:
         lines.extend(["**暂时无需操作。**", "", paragraphs(state["user_message"]), ""])
     lines.extend(["**接下来：**", "", paragraphs(state["next_step"]["text"]), "",
-                  "## C 三个阶段，走到哪里", "", "| 阶段 | 状态 | 当前记录 |", "|---|---|---|"])
+                  "## C 审查阶段", "", "| 阶段 | 状态 | 当前记录 |", "|---|---|---|"])
     for phase in state["phases"]:
         label = "待反馈" if phase["status"] == "waiting_user" else LABELS[phase["status"]]
         badge = "ok 已完成" if phase["status"] == "completed" else "warn " + label
         lines.append(f"| {PHASE_LABELS[phase['id']]} | {badge} | {text(phase['note'])} |")
-    lines.extend(["", "## D 交付与关键结果", ""])
+    lines.extend(["", "## D 审查结果与证据", ""])
     delivery_criterion = next((c for c in state["goal"]["criteria"] if c["id"] == "delivery"), {})
     evidence = delivery_criterion.get("evidence")
     delivery = delivery_criterion.get("evidence_href")
