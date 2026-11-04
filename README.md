@@ -28,7 +28,7 @@ npx skills add HoeTee/code-review-lifecycle-skill --agent codex claude-code open
 
 > Use the `code-review-lifecycle` skill to review this PR. Show me the findings, which checks ran on this revision, and what I need to decide before merging.
 
-PR and CI operations use your existing repository permissions. The HTML renderer is bundled. [Agent support](references/agent-support.md) · [Renderer source and licenses](scripts/vendor/answer-me-with-html/README.md)
+PR and CI operations use your existing repository permissions. The HTML renderer is bundled. [Agent support](references/agent-support.md)
 
 ## What you can do
 
@@ -98,4 +98,4 @@ If you change the progress renderer, run `python -m unittest discover -s scripts
 
 ## License
 
-The project’s own work is licensed under the [MIT License](LICENSE). The bundled HTML renderer, fonts, and dependencies retain their [upstream licenses](scripts/vendor/answer-me-with-html/README.md).
+The project’s own work is licensed under the [MIT License](LICENSE).
