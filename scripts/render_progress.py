@@ -106,7 +106,7 @@ def render(state: dict) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, epilog="Default renderer: answer-me-with-html. Set presentation.renderer=native only when explicitly selected.")
+    parser = argparse.ArgumentParser(description=__doc__, epilog="Default renderer: review-html. Set presentation.renderer=native only when explicitly selected.")
     parser.add_argument("state", type=Path, help="JSON task state; see assets/progress.example.json")
     parser.add_argument("--output", required=True, type=Path, help="Stable HTML output path, reused for this task")
     args = parser.parse_args()
@@ -114,8 +114,8 @@ def main() -> None:
         parser.error("State input and HTML output must be different files")
     try:
         state = json.loads(args.state.read_text(encoding="utf-8-sig"))
-        renderer = state.get("presentation", {}).get("renderer", "answer-me-with-html")
-        if renderer == "answer-me-with-html":
+        renderer = state.get("presentation", {}).get("renderer", "review-html")
+        if renderer in {"review-html", "answer-me-with-html"}:
             from answer_progress import render_answer_progress
             validate(state)
             render_answer_progress(state, args.state, args.output)

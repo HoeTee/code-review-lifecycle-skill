@@ -1,3 +1,0 @@
-scripts/vendor/** linguist-vendored=true
-# Preserve the generated upstream bundle byte for byte.
-scripts/vendor/answer-me-with-html/am.mjs -whitespace

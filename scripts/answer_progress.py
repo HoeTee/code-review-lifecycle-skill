@@ -1,4 +1,4 @@
-"""Project a task snapshot to Markdown, then use the selected am renderer."""
+"""Project a task snapshot to Markdown and render it."""
 from __future__ import annotations
 
 import re

@@ -8,13 +8,13 @@
 
 ## 生成页面
 
-说明页从 Markdown 草稿生成。需要 Node.js 20 或更新版本。以下脚本路径以已加载的 `SKILL.md` 目录为准。
+说明页由本项目的渲染器从 Markdown 草稿生成。需要 Node.js 20 或更新版本。以下脚本路径以已加载的 `SKILL.md` 目录为准。
 
 ```sh
 node /ABSOLUTE/SKILL/scripts/render_html.mjs render /ABSOLUTE/draft.md -o /ABSOLUTE/page.html --no-open --theme blueprint --mode light
 ```
 
-用同一入口的 `help format` 查草稿格式。已有页面只改一个面板时看 `help patch`。任务快照用随包脚本渲染：
+用同一入口的 `help format` 查草稿格式，支持标题、面板、列表、链接、表格和代码块。已有页面只改一个面板时看 `help patch`。任务快照用随包脚本渲染：
 
 ```sh
 python /ABSOLUTE/SKILL/scripts/render_progress.py /ABSOLUTE/task.progress.json --output /ABSOLUTE/task.html
@@ -22,8 +22,8 @@ python /ABSOLUTE/SKILL/scripts/render_progress.py /ABSOLUTE/task.progress.json -
 
 新快照的目标模式为 `review`，阶段为 `prepare`、`review`、`human_review`。见 [状态样例](../assets/progress.example.json)。脚本兼容已有快照。记录文本证据用 `evidence`，链接另用 `evidence_href`。
 
-默认渲染器是随包的 Answer me with HTML，默认主题为浅色图纸。显式选择 `presentation.renderer: native` 时使用内置模板。既有 `presentation.am_cli` 可继续指定自定义入口。工具缺失或渲染失败时，报告缺项并保留聊天结果。
+进度页默认使用同一渲染器，主题为浅色图纸。显式选择 `presentation.renderer: native` 时使用独立的进度模板。既有 `presentation.am_cli` 可继续指定自定义入口。工具缺失或渲染失败时，报告缺项并保留聊天结果。
 
 ## 核对页面
 
-首屏回答当前阶段、版本、是否需要人行动和下一步。证据可展开。页面是静态快照，复制指令和查看证据分别标明。按钮与平台动作仅在实际接通时关联。
+首屏回答当前阶段、版本、是否需要人行动和下一步。详细证据在独立面板中查看。页面是静态快照，回复指令和证据链接分别标明。页面上的操作链接需要有实际目标。
