@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>任务进度</title>
+<style>
+:root{font:15px/1.55 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:#202522;background:#f5f6f4;--muted:#68726b;--line:#dde3dd;--green:#166344;--soft:#edf5ef;--orange:#8d520f;--warn:#fff7e9}
+*{box-sizing:border-box}body{margin:0}button,a{-webkit-tap-highlight-color:transparent}button{font:inherit;cursor:pointer}button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid #65a88c;outline-offset:4px}a{color:var(--green);text-underline-offset:3px}header{border-bottom:1px solid var(--line);background:#fff}header>div{max-width:1160px;margin:auto;padding:17px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px}.brand{font-weight:750;letter-spacing:-.3px}.brand span{font-weight:400;color:var(--muted);margin-left:12px}.quiet{background:white;border:1px solid var(--line);border-radius:8px;padding:7px 12px;color:#414b44}main{max-width:1160px;margin:auto;padding:30px 28px 44px}.eyebrow{font-size:12px;letter-spacing:.09em;color:var(--muted);font-weight:650}h1{font-size:clamp(25px,3vw,34px);letter-spacing:-1px;line-height:1.25;margin:7px 0 9px}h2{font-size:17px;margin:0 0 14px;letter-spacing:-.3px}h3{font-size:15px;margin:0 0 6px}p{margin:7px 0}.muted,.meta{color:var(--muted)}.meta{font-size:12px}.hero{display:flex;justify-content:space-between;gap:24px;align-items:start}.hero>div:first-child{max-width:760px}.scope{margin:0 0 10px;color:#5a655d}.pill{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:6px 13px;font-size:13px;font-weight:650;background:var(--soft);color:var(--green);white-space:nowrap}.pill:before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}.pill.failed,.pill.blocked{background:#fff0ea;color:#9d3e22}.pill.waiting_user{background:var(--warn);color:var(--orange)}.pill.not_started{background:#e9ece9;color:#626b64}.pill.running{background:#e8f0fa;color:#2d5883}.phases{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:22px 0 20px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}.phase{padding:13px 17px;display:flex;gap:12px;align-items:center}.phase+.phase{border-left:1px solid var(--line)}.phase.current{background:var(--soft)}.phase-number{height:29px;width:29px;display:grid;place-items:center;background:#f0f2ef;border-radius:50%;color:#68726b;flex-shrink:0;font-size:13px}.phase.current .phase-number{background:var(--green);color:#fff}.phase-title{font-weight:650;font-size:14px}.phase-note{font-size:12px;color:var(--muted)}.grid{display:grid;grid-template-columns:1.05fr 1fr;gap:16px}.card{border:1px solid var(--line);border-radius:13px;padding:20px 22px;background:#fff}.attention{border-color:#b9cebf;background:#fcfefc}.attention h2{color:var(--green)}.action-title{font-size:27px;font-weight:680;line-height:1.3;letter-spacing:-.7px;margin:13px 0 8px}.card .label{font-size:12px;font-weight:650;color:var(--muted)}.divider{border:0;border-top:1px solid var(--line);margin:15px 0}.next-line{display:flex;justify-content:space-between;gap:12px;align-items:center}.next-kind{font-size:11px;background:#f0f2ef;color:#58625b;padding:3px 7px;border-radius:5px;white-space:nowrap}.primary{background:var(--green);color:#fff;border:0;border-radius:8px;padding:9px 13px;font-weight:600;margin-top:10px}.primary:active{background:#104b33}.instruction{margin-top:8px;color:var(--muted);font-size:12px}.issue-strip{margin:15px 0 0;border:1px solid #e7d6b6;background:var(--warn);padding:13px 17px;border-radius:10px;display:flex;gap:13px;align-items:center;justify-content:space-between;font-size:13px}.issue-strip strong{color:var(--orange)}.text-button{border:0;background:none;color:var(--orange);text-decoration:underline;text-underline-offset:3px;padding:4px;white-space:nowrap}.results{display:flex;gap:22px;flex-wrap:wrap;margin:17px 2px 20px}.result{font-size:12px;color:var(--muted)}.result strong{color:#27352c;font-size:14px;margin-right:5px}.tabs{display:flex;gap:20px;border-bottom:1px solid var(--line);margin-top:3px}.tabs button{padding:10px 2px 11px;border:0;background:none;border-bottom:2px solid transparent;color:var(--muted);font-size:14px}.tabs button[aria-selected=true]{color:var(--green);border-bottom-color:var(--green);font-weight:650}.panel{padding-top:20px}.panel[hidden]{display:none}.overview{display:grid;grid-template-columns:1fr 1fr;gap:22px}.note{font-size:13px;color:#536057}.issue{padding:12px 0;border-bottom:1px solid var(--line)}.issue:first-child{padding-top:0}.issue:last-child{border-bottom:0;padding-bottom:0}.issue .meta{margin-top:6px}.tag{font-size:11px;color:var(--orange);font-weight:650;margin-right:7px}.check{display:grid;grid-template-columns:70px 1fr;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}.check:first-child{padding-top:0}.check:last-child{border:0}.check-status{font-size:12px;padding-top:3px;color:var(--green);font-weight:650}.check-status.failed{color:#a23c27}.check-status.not_run{color:var(--muted)}details{margin-top:9px;font-size:13px}summary{cursor:pointer;color:var(--green);width:fit-content}pre{padding:13px;background:#f4f6f3;border-radius:8px;overflow:auto;font-size:12px;line-height:1.6}code{font-family:ui-monospace,Consolas,monospace}.file{display:grid;grid-template-columns:minmax(170px,.8fr) 1.2fr;gap:18px;padding:12px 0;border-bottom:1px solid var(--line);font-size:13px}.file a{overflow-wrap:anywhere}.event{display:grid;grid-template-columns:150px 1fr;gap:14px;padding:12px 0;border-bottom:1px solid var(--line);font-size:13px}.footer{margin-top:24px;padding-top:14px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap}#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#213b2d;color:#fff;padding:11px 18px;border-radius:9px;font-size:13px;max-width:90vw;box-shadow:0 5px 22px #0002;z-index:10}#toast[hidden]{display:none}textarea{width:100%;margin-top:10px;padding:12px;font:inherit;border:1px solid var(--line);border-radius:8px}#fallback{margin:14px 0;padding:14px;background:var(--warn);border-radius:9px}#fallback[hidden]{display:none}.user-action+.user-action{margin-top:15px;padding-top:15px;border-top:1px solid var(--line)}
+header>div{padding-top:10px;padding-bottom:10px}main{padding-top:20px}h1{font-size:clamp(25px,3vw,30px);margin:5px 0 7px}.scope{margin-bottom:7px}.phases{margin:16px 0}.phase{padding-top:10px;padding-bottom:10px}.card{padding:16px 18px}.card h2{margin-bottom:9px}.card p{margin:5px 0}.divider{margin:10px 0}.primary{padding:8px 12px;margin-top:6px}.instruction{margin-top:5px;font-size:11px}.issue-strip{margin-top:12px;padding:10px 14px}
+@media(max-width:720px){header>div{padding:10px 18px}.brand span{display:none}main{padding:18px}.hero{gap:12px;flex-wrap:wrap}.hero .pill{order:-1}.phases{margin-top:17px}.phase{padding:11px 9px;gap:7px;align-items:start}.phase-number{height:23px;width:23px;font-size:11px}.phase-title{font-size:12px}.phase-note{font-size:11px}.grid,.overview{grid-template-columns:1fr}.card{padding:18px}.action-title{font-size:25px}.issue-strip{align-items:start}.results{gap:10px 18px}.tabs{gap:18px}.tabs button{font-size:13px}.file,.event{grid-template-columns:1fr;gap:4px}.footer{gap:6px}}
+.criterion{display:flex;gap:9px;margin:8px 0;font-size:13px}.criterion-mark{color:var(--muted);min-width:17px}.criterion.passed .criterion-mark{color:var(--green)}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<header><div><div class="brand">Code Review <span id="project"></span></div><button class="quiet" id="refresh" type="button">刷新快照</button></div></header>
+<main>
+  <div class="hero"><div><div class="eyebrow">任务进度</div><h1 id="title"></h1><p class="scope" id="scope"></p><div class="meta" id="version"></div></div><span class="pill" id="status"></span></div>
+  <div class="phases" id="phases" aria-label="PR 阶段"></div>
+  <div class="grid">
+    <section class="card attention" aria-labelledby="action-heading"><h2 id="action-heading">你现在需要做什么</h2><div id="user-area"></div></section>
+    <section class="card" aria-labelledby="agent-heading"><h2 id="agent-heading">Agent 进度与下一步</h2><div class="label">当前动作</div><p id="current-action"></p><hr class="divider"><div class="next-line"><div class="label" id="next-owner"></div><span class="next-kind" id="next-kind"></span></div><p id="next-text"></p><div id="next-control"></div></section>
+  </div>
+  <div class="issue-strip" id="issue-strip"><div id="issue-summary"></div><button class="text-button" id="show-issues" type="button">查看影响与责任</button></div>
+  <div class="results" id="results" aria-label="最近结果"></div>
+  <div id="fallback" hidden><strong>浏览器无法自动复制，请选中下面的指令：</strong><textarea id="fallback-text" readonly aria-label="待复制指令"></textarea><p class="meta">复制或查看指令均不会执行任务。</p></div>
+  <div class="tabs" role="tablist" aria-label="任务详情">
+    <button role="tab" id="tab-overview" aria-controls="panel-overview" aria-selected="true" tabindex="0">概览</button>
+    <button role="tab" id="tab-evidence" aria-controls="panel-evidence" aria-selected="false" tabindex="-1">检查与证据</button>
+    <button role="tab" id="tab-files" aria-controls="panel-files" aria-selected="false" tabindex="-1">改动文件</button>
+    <button role="tab" id="tab-history" aria-controls="panel-history" aria-selected="false" tabindex="-1">历史</button>
+  </div>
+  <section class="panel" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview"><div class="overview"><div><h2 id="issues-heading">问题与未开展事项</h2><div id="issues"></div></div><div><h2>整体目标与完成条件</h2><div id="criteria"></div><p class="note" id="boundary"></p><div id="links"></div></div></div></section>
+  <section class="panel" id="panel-evidence" role="tabpanel" aria-labelledby="tab-evidence" hidden><h2>实际检查及其证据时间</h2><div id="checks"></div></section>
+  <section class="panel" id="panel-files" role="tabpanel" aria-labelledby="tab-files" hidden><h2>按需查看源文件</h2><div id="files"></div></section>
+  <section class="panel" id="panel-history" role="tabpanel" aria-labelledby="tab-history" hidden><h2>关键事件</h2><div id="history"></div></section>
+  <footer class="footer"><span id="updated"></span><span>任务快照 · 无后台监听 · Agent 更新后刷新查看</span></footer>
+</main>
+<div role="status" aria-live="polite" id="toast" hidden></div>
+<script id="task-state" type="application/json">__STATE_JSON__</script>
+<script>
+'use strict';
+const state = JSON.parse(document.getElementById('task-state').textContent);
+const labels = {running:'正在执行',waiting_user:'等待你决定',blocked:'遇到阻断',failed:'执行失败',not_started:'尚未开始',completed:'目标已完成'};
+const checkLabels = {passed:'通过',failed:'失败',not_run:'未执行'};
+const $ = id => document.getElementById(id);
+function node(tag,text,cls){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(cls)el.className=cls;return el;}
+function time(value){return new Date(value).toLocaleString('zh-CN',{hour12:false});}
+function link(item){const el=node('a',item.label||item.name);el.href=item.href;return el;}
+let toastTimer;
+function toast(text){$('toast').textContent=text;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{$('toast').hidden=true;},5000);}
+async function copy(instruction){
+  try{if(!navigator.clipboard)throw new Error('Clipboard unavailable');await navigator.clipboard.writeText(instruction);toast('已复制，请粘贴到当前对话；尚未执行。');}
+  catch(error){$('fallback').hidden=false;$('fallback-text').value=instruction;$('fallback-text').focus();$('fallback-text').select();toast('请手动复制；尚未执行。');}
+}
+function copyButton(text){const button=node('button','复制给 Agent 的指令','primary');button.type='button';button.addEventListener('click',()=>copy(text));return button;}
+function selectTab(name,focus=false){
+  for(const button of document.querySelectorAll('[role=tab]')){const selected=button.id==='tab-'+name;button.setAttribute('aria-selected',String(selected));button.tabIndex=selected?0:-1;$(button.getAttribute('aria-controls')).hidden=!selected;if(selected&&focus)button.focus();}
+}
+document.title=state.title+' · 任务进度';
+$('project').textContent=state.project;$('title').textContent=state.title;$('scope').textContent=state.scope;
+$('version').textContent='版本 '+state.source_commit+' · 状态同步 '+time(state.updated_at);
+$('status').textContent=labels[state.status];$('status').className='pill '+state.status;
+$('current-action').textContent=state.current_action;
+$('updated').textContent='任务 '+state.task_id+' · 证据时间单独记录';
+state.phases.forEach((phase,index)=>{const row=node('div',undefined,'phase'+(phase.id===state.phase?' current':''));row.append(node('span',phase.status==='completed'?'✓':String(index+1),'phase-number'));const body=node('div');body.append(node('div',phase.label,'phase-title'),node('div',phase.note||labels[phase.status],'phase-note'));row.append(body);if(phase.id===state.phase)row.setAttribute('aria-current','step');$('phases').append(row);});
+if(state.user_actions.length){
+  state.user_actions.forEach(action=>{const box=node('div',undefined,'user-action');box.append(node('div',action.question,'action-title'),node('p','建议：'+action.recommendation),node('p','影响：'+action.impact,'note'));if(action.instruction)box.append(copyButton(action.instruction));else box.append(node('p',action.reply_hint,'instruction'));$('user-area').append(box);});
+}else{$('user-area').append(node('div','暂时无需操作','action-title'),node('p',state.user_message,'note'));}
+$('next-owner').textContent='下一步 · '+state.next_step.owner;
+$('next-kind').textContent={automatic:'已有安排',proposal:'建议的新任务',none:'本轮已结束'}[state.next_step.kind];
+$('next-text').textContent=state.next_step.text;
+if(state.next_step.instruction){$('next-control').append(copyButton(state.next_step.instruction),node('div','仅复制到剪贴板，不会开始执行。','instruction'));}
+const blockers=state.issues.filter(item=>item.blocking);
+const summary=node('strong',blockers.length?'本轮阻断 '+blockers.length+' 项':'本轮卡点 0 项');
+$('issue-summary').append(summary,node('span','　'+(state.attention_summary||'尚未开展的阶段不计为执行失败。')));
+state.results.forEach(item=>{const box=node('div',undefined,'result');box.append(node('strong',item.value),node('span',item.label));$('results').append(box);});
+$('boundary').textContent=state.boundary||state.scope;
+state.goal.criteria.forEach(criterion=>{const row=node('div',undefined,'criterion '+criterion.status);row.append(node('span',{passed:'✓',pending:'○',not_applicable:'—'}[criterion.status],'criterion-mark'),node('span',criterion.title));$('criteria').append(row);});
+state.issues.forEach(issue=>{const box=node('article',undefined,'issue');const heading=node('h3');heading.append(node('span',issue.blocking?'本轮阻断':'非本轮阻断','tag'),document.createTextNode(issue.title));box.append(heading,node('p',issue.impact,'note'),node('p','负责：'+issue.owner+' · '+issue.next_action,'meta'));$('issues').append(box);});
+if(!state.issues.length)$('issues').append(node('p','本轮没有记录中的问题。','note'));
+state.links.forEach(item=>{const p=node('p');p.append(link(item));$('links').append(p);});
+state.checks.forEach(check=>{const box=node('article',undefined,'check');box.append(node('div',checkLabels[check.status],'check-status '+check.status));const body=node('div');body.append(node('h3',check.title),node('p',check.summary,'note'));if(check.observed_at)body.append(node('div','证据时间：'+time(check.observed_at),'meta'));if(check.details||check.href||check.command){const detail=node('details');detail.append(node('summary','展开方法与原始证据'));if(check.details)detail.append(node('p',check.details));if(check.command){const pre=node('pre');pre.append(node('code',check.command));detail.append(pre);}if(check.href){const p=node('p');p.append(link({label:'查看原始记录',href:check.href}));detail.append(p);}body.append(detail);}box.append(body);$('checks').append(box);});
+state.files.forEach(file=>{const row=node('div',undefined,'file');row.append(link(file),node('span',file.description));$('files').append(row);});
+state.history.forEach(event=>{const row=node('div',undefined,'event');row.append(node('span',event.time,'meta'),node('span',event.text));$('history').append(row);});
+for(const button of document.querySelectorAll('[role=tab]')){
+  button.addEventListener('click',()=>selectTab(button.id.slice(4)));
+  button.addEventListener('keydown',event=>{const tabs=[...document.querySelectorAll('[role=tab]')];const index=tabs.indexOf(button);const moves={ArrowRight:(index+1)%tabs.length,ArrowLeft:(index+tabs.length-1)%tabs.length,Home:0,End:tabs.length-1};if(event.key in moves){event.preventDefault();selectTab(tabs[moves[event.key]].id.slice(4),true);}});
+}
+$('show-issues').addEventListener('click',()=>{selectTab('overview');$('issues-heading').scrollIntoView({block:'start',behavior:'auto'});});
+$('refresh').addEventListener('click',()=>location.reload());
+</script>
+</body>
+</html>
