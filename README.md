@@ -95,3 +95,7 @@ python scripts/render_progress.py assets/progress.example.json --output progress
 ```
 
 If you change the progress renderer, run `python -m unittest discover -s scripts`.
+
+## License
+
+The project’s own work is licensed under the [MIT License](LICENSE). The bundled HTML renderer, fonts, and dependencies retain their [upstream licenses](scripts/vendor/answer-me-with-html/README.md).
