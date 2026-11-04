@@ -2,9 +2,9 @@
 
 [English](../README.md) · [简体中文](README.zh-CN.md) · 日本語
 
-**Codex、Claude Code、OpenCode で PR のレビューからリリースまでを支援するスキルです。**
+**Codex、Claude Code、OpenCode 向けのコードレビュースキルです。**
 
-AI が問題を見つけ、修正を再確認します。レビュー担当者は、変更内容、実行したチェック、残っている判断事項をまとめて確認できます。既存の PR から始めることも、受け入れ条件の整理からリリースまで進めることもできます。
+「コードレビューして」と依頼すると、エージェントは適用される `CLAUDE.md` と `REVIEW.md` を読み、ローカルの変更や既存の PR を特定します。指摘、検証結果、人が判断する項目をまとめます。
 
 Claude Code チームの早期レビュー、レビュー回数の上限、重要なコードの解説を参考にしています。 [Claude Code チームのコードレビュー](https://claude.dev/blog/solving-code-review-at-anthropic/)
 

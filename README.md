@@ -1,8 +1,8 @@
 # Code Review Lifecycle
 
-**Review changes with AI. Give people the evidence to decide what ships.**
+**Review code changes with AI. Give human reviewers the evidence to decide.**
 
-An Agent Skill for Codex, Claude Code, and OpenCode. Start with an existing PR or follow a change from acceptance criteria through delivery.
+An Agent Skill for Codex, Claude Code, and OpenCode. Ask for a code review and it identifies the local changes or pull request to review.
 
 [📦 Install](#install-and-try-it) · [🔎 See an example](#example-review) · [🧭 Follow the workflow](#workflow) · [📚 Browse the guides](#repository-guide)
 
@@ -14,7 +14,7 @@ An Agent Skill for Codex, Claude Code, and OpenCode. Start with an existing PR o
 
 ## Install and try it
 
-Run this in your project with Node.js 20 or newer and Git. List only the agents you use after `--agent`. Add `--global` to install for your user account.
+Run this in your project with Git and Node.js 22.20 or newer, as required by the `skills` installer. List only the agents you use after `--agent`. Add `--global` to install for your user account. [Installer package](https://www.npmjs.com/package/skills)
 
 ```sh
 npx skills add HoeTee/code-review-lifecycle-skill --agent codex claude-code opencode
@@ -26,16 +26,9 @@ npx skills add HoeTee/code-review-lifecycle-skill --agent codex claude-code open
 | Claude Code | Run `/code-review-lifecycle` followed by your request. |
 | OpenCode | Ask OpenCode to load `code-review-lifecycle` and describe your task. |
 
-> Use the `code-review-lifecycle` skill to review this PR. Show me the findings, which checks ran on this revision, and what I need to decide before merging.
+> Use the `code-review-lifecycle` skill to review my changes.
 
-PR and CI operations use your existing repository permissions. The HTML renderer is bundled. [Agent support](references/agent-support.md)
-
-## What you can do
-
-| Set up a project | Review a pull request | Investigate a regression |
-| --- | --- | --- |
-| Define acceptance criteria and reuse the repository’s test and review rules. | Verify AI findings, recheck fixes, and prepare a brief for the human reviewer. | Match logs to the deployed revision, then plan a fix and a way to verify it. |
-| [Project setup](references/project-setup.md) | [PR workflow](references/pr-workflow.md) | [Delivery and recovery](references/delivery-recovery.md) |
+PR and CI operations use your existing repository permissions. The bundled HTML renderer runs on Node.js 20 or newer. [Agent support](references/agent-support.md)
 
 ## Example review
 
@@ -58,17 +51,16 @@ node scripts/render_html.mjs render docs/showcase/export-review.md -o export-rev
 
 ## Workflow
 
-| Stage | What gets recorded |
+| Stage | What happens |
 | --- | --- |
-| **Before the PR** | Acceptance criteria, affected behavior, local checks, and their results. |
-| **Open the PR** | The current revision and required CI results. CI and AI review can run in parallel. |
-| **Review and revise** | Verified findings, fixes, and evidence from the revised commit. |
-| **Human review and merge** | The reviewer’s decision, evidence, and remaining risks for the reviewed commit. |
-| **After merge** | The merge commit and, when in scope, release, deployment, and target environment results. |
+| **Read review rules** | Read the applicable `CLAUDE.md` and `REVIEW.md` before analyzing the diff. |
+| **Identify the change** | Determine the local candidate or PR head and its comparison base. |
+| **Review and verify** | Check the diff and affected code. Report findings and the checks that apply to the reviewed version. |
+| **Prepare human review** | Summarize the evidence, remaining risks, and decisions for the reviewed PR and commit. |
 
 ### AI review and revision
 
-An independent reviewer reads the diff and follows relevant call paths when that capability is available. A finding gives the location, trigger, impact, and a way to verify it. The author checks the evidence and fixes confirmed defects. Later passes recheck the fixes and their effects.
+An independent reviewer reads the diff and follows relevant call paths when that capability is available. A finding gives the location, trigger, impact, and a way to verify it. Reviews are read-only by default. When fixes are authorized, re-review the revised changes and their effects.
 
 The cycle ends when no blockers remain and runs for up to three completed review rounds by default. If blockers remain after round three, the agent pauses automated fixes, explains why the approach stalled, and proposes a next step. [PR workflow and AI review](references/pr-workflow.md)
 
@@ -83,7 +75,7 @@ The workflow draws on the Claude Code team’s practices for early review, limit
 | Start here | What it covers |
 | --- | --- |
 | [SKILL.md](SKILL.md) | The shared entry point and how the agent chooses a stage. |
-| [Project setup](references/project-setup.md) and [review rules template](assets/REVIEW.template.md) | Adapt the workflow to your existing `AGENTS.md`, `CLAUDE.md`, or `REVIEW.md`. |
+| [Review target and rules](references/review-target.md) and [review rules template](assets/REVIEW.template.md) | See how the skill chooses a diff and applies repository rules. |
 | [Verification](references/verification.md) | Choose checks based on the change and its effects. |
 | [GitHub](references/platforms/github.md) and [Gitee](references/platforms/gitee.md) | Connect to the platform and inspect PR and CI evidence. |
 | [Progress data](assets/progress.example.json) and [validation scenarios](references/validation-scenarios.md) | Try a local snapshot or verify a change to the skill. |
@@ -94,7 +86,7 @@ The skill instructions, templates, and reference guides are mainly in Chinese. T
 python scripts/render_progress.py assets/progress.example.json --output progress-example.html
 ```
 
-If you change the progress renderer, run `python -m unittest discover -s scripts`.
+Run `python -B -m unittest discover -s scripts -v` to check progress evidence, HTML rendering and panel updates, and the integrity of the bundled renderer. GitHub Actions runs the same suite for pull requests and pushes to `main`.
 
 ## License
 

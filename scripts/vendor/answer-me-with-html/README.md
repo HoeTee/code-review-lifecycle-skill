@@ -1,8 +1,8 @@
 # Answer me with HTML
 
-`am.mjs` is the generated CLI from [Answer me with HTML v0.5.10](https://github.com/QingYunA/answer-me-with-html/tree/f82dd6dce3ca95b0e565f8cffaf5eba23f4c995f). It is included without changes. The SHA-256 of the upstream file is `5e08fda8e976927b16596624cf605e5aadd77828ee690a412b5a9a96584d4f2c`.
+`am.mjs` is the generated CLI from [Answer me with HTML v0.5.10](https://github.com/QingYunA/answer-me-with-html/tree/f82dd6dce3ca95b0e565f8cffaf5eba23f4c995f). The local bundle changes the project name and both GitHub links in the page credit. The integrity test reverses those two source edits and checks the result against the original upstream SHA-256, `5e08fda8e976927b16596624cf605e5aadd77828ee690a412b5a9a96584d4f2c`.
 
-The skill calls this bundle through `scripts/render_html.mjs`. The wrapper disables the upstream update check. To update the renderer, replace the bundle and accompanying notices from a pinned upstream release and rerun the rendering and installation checks.
+The skill calls this bundle through `scripts/render_html.mjs`. The wrapper disables the upstream update check. To update the renderer, replace the bundle and accompanying notices from a pinned upstream release, reapply the page credit in `colophon`, and rerun the rendering and installation checks.
 
 - [Answer me with HTML](LICENSE)
 - [marked 18.0.14](licenses/marked.txt)

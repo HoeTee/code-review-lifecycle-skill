@@ -51,29 +51,10 @@ python SCRIPT_FILE --api-base API_BASE --path repos/OWNER/REPO/pulls/NUMBER/comm
 helper 不自动分页；列表按实例支持的 page/per_page 用 JSON 参数文件传给 --body-file，持续读取到结束，不以第一页当完整。
 记录接口返回的源提交、目标基础以及本次检查关联。无法核对必需门槛时保留未验证。
 
-## 授权后的写操作
+## 意见与 CI
 
-创建 PR 前，Agent 根据当前分支、目标分支及验证事实写 PR_JSON_FILE，字段为 title、head、base、body。
-先预览，再在已有授权内实际发送：
+经授权发表评论时，按实例手册向对应 PR 的评论接口提交。标明技术意见来源与受审版本。回读实际线程状态和审批要求。
 
-```sh
-python SCRIPT_FILE --api-base API_BASE --path repos/OWNER/REPO/pulls --method POST --body-file PR_JSON_FILE --select number,html_url --dry-run
-python SCRIPT_FILE --api-base API_BASE --path repos/OWNER/REPO/pulls --method POST --body-file PR_JSON_FILE --select number,html_url
-```
-
-更新说明时按实例契约 PATCH repos/OWNER/REPO/pulls/NUMBER；评论按 POST repos/OWNER/REPO/pulls/NUMBER/comments，JSON 文件字段由该契约确定。
-评论与变更分别回读确认，AI 技术意见和代记的人类验收标明来源及对应版本。
-合并接口、审批限制和线程处理按该实例手册实施，不能从 GitHub 命令或一个 HTTP 成功推定。
-helper 未实现自动重试写请求、CI 配置或权限推断；失败后先核对远端状态，避免重复创建。
-默认 HTTPS，私有 CA 可用 --ca-file。只有手册明确的本地/内网 HTTP 才使用 --allow-http。
-query token 的要求来自 API v5 契约，避免记录含凭据的请求 URL；helper 输出会脱敏，不使用 verbose 导出原凭据。
-
-## CI 与工具绑定
-
-识别实际使用的 Gitee 流水线或其他 CI，再只读所需手册。
-项目资料写明配置位置、触发、执行器、必需检查、运行和日志的实际查询工具/命令及账号能力。
-缺少 API/CLI 步骤时从官方或用户手册补齐并保存，不能只写“接入 CI”或声称 helper 自动设置了流水线。
-仅网页可操作时按当前允许的浏览器工具执行；工具缺失才准备。
-按实际操作回读记录：已认证、仓库可访问、PR 写入、CI 触发及规则有效分别确认。
+读取已有流水线的必需检查、运行和日志。核对检查与受审版本的关系。仅能通过网页查看时，使用当前允许的浏览器入口。
 
 参考：[Gitee OpenAPI](https://gitee.com/api/v5/swagger)、[API 规范](https://gitee.com/api/v5/swagger_doc)、[流水线](https://help.gitee.com/enterprise/pipeline)、[Windows Python](https://learn.microsoft.com/en-us/windows/dev-environment/python)。
