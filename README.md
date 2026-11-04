@@ -2,11 +2,11 @@
 
 [English](#code-review-lifecycle) · [简体中文](#简体中文) · [日本語](#日本語)
 
-**A Codex skill for reviewing and delivering code changes.** Start with acceptance criteria, verify the change locally and in CI, then give a human reviewer the evidence to make a merge decision. Use the full workflow or start with the stage you need.
+**A Codex skill for reviewing pull requests and delivering changes.**
 
-[Install](#install-and-try-it) · [Example review](#example-review) · [Workflow](#workflow) · [Repository guide](#repository-guide)
+AI finds issues and rechecks fixes. A human reviewer gets a short brief with what changed, which checks ran, and what still needs a decision. Start with an existing PR or follow a change from acceptance criteria through delivery.
 
-The workflow draws on the Claude Code team’s practices for reviewing early, limiting review rounds, and explaining the code a person needs to understand. This skill uses those practices to prepare a final human review tied to a specific PR and commit. [How the Claude Code team does code review](https://claude.dev/blog/solving-code-review-at-anthropic/)
+[📦 Install](#install-and-try-it) · [🔎 See an example](#example-review) · [🧭 Follow the workflow](#workflow) · [📚 Browse the guides](#repository-guide)
 
 ## Install and try it
 
@@ -16,9 +16,12 @@ Run this from the target project directory with Node.js, `npx`, and Git installe
 npx skills add HoeTee/code-review-lifecycle-skill --agent codex
 ```
 
-In Codex, pick the starting point that matches your task.
+**Try it on an existing PR.** Paste this prompt into Codex.
 
-- **Review an existing PR.** “Use `$code-review-lifecycle` to review this PR. Show me the findings, checks for the current revision, and decisions I need to make before merge.”
+> Use `$code-review-lifecycle` to review this PR. Show me the findings, checks for the current revision, and decisions I need to make before merging.
+
+**Other ways to start**
+
 - **Set up a project.** “Use `$code-review-lifecycle` to propose local checks, CI requirements, and review rules for this repository. Start from our existing project instructions.”
 - **Investigate a regression.** “Use `$code-review-lifecycle` to compare these logs with the deployed revision and propose a fix and a way to verify it.”
 
@@ -35,6 +38,8 @@ Suppose a PR changes who can export project data. A user starts an export, then 
 | **Human decision** | The review brief shows the request handler, worker, and regression result alongside the full diff. The reviewer decides whether `Export unavailable` gives users enough information when access is revoked. |
 
 ## Workflow
+
+The workflow draws on the Claude Code team’s practices for early review, limiting review rounds, and explaining the code a person needs to understand. This skill uses those practices to prepare a final human review tied to a specific PR and commit. [How the Claude Code team does code review](https://claude.dev/blog/solving-code-review-at-anthropic/)
 
 | Stage | What happens | What gets recorded |
 | --- | --- | --- |
@@ -77,7 +82,11 @@ If you change the progress renderer, run its tests with `python -m unittest disc
 
 ## 简体中文
 
-这是一个面向 Codex 的代码审查与交付 skill。流程从明确验收标准和本地验证开始，经过 PR、CI、AI 审查和返修，再由人审核当前版本。合并后按任务要求交付，并在目标环境验收。它参考了 Claude Code 团队的早期审查、审查轮次上限和关键代码解释做法。 [Claude Code 团队的代码审查实践](https://claude.dev/blog/solving-code-review-at-anthropic/)
+**面向 Codex 的 PR 审查与交付 skill。**
+
+AI 找出问题并复核修复。审核人拿到一份简明说明，能看到改动了什么、跑过哪些检查、还需要决定什么。可以从已有 PR 开始，也可以从验收标准、本地验证一路走到合并和交付。
+
+流程参考了 Claude Code 团队的早期审查、审查轮次上限和关键代码解释做法。 [Claude Code 团队的代码审查实践](https://claude.dev/blog/solving-code-review-at-anthropic/)
 
 - **AI 审查**检查 diff 和相关调用链，给出问题位置、触发条件、影响和验证办法。作者核实并修复，审查者复核。默认每个 PR 最多三轮。第三轮仍有阻断项时，暂停自动返修，说明原因并提出下一步。 [AI 审查流程](references/pr-workflow.md)
 - **人工审核**看行为变化、关键代码、完整 diff、实际检查结果和剩余风险。审核人明确选择通过、要求修改或暂缓，结论绑定对应 PR 和提交。 [人工审核材料](references/human-review.md)
@@ -88,7 +97,11 @@ If you change the progress renderer, run its tests with `python -m unittest disc
 
 ## 日本語
 
-Codex 向けのコードレビューとリリースを支援するスキルです。受け入れ条件の明確化とローカル検証から始め、PR の CI、AI レビュー、修正と再確認へ進みます。人が対象の変更をレビューしてからマージし、必要に応じて対象環境で動作を確認します。Claude Code チームの早期レビュー、レビュー回数の上限、重要なコードの解説を参考にしています。 [Claude Code チームのコードレビュー](https://claude.dev/blog/solving-code-review-at-anthropic/)
+**PR のレビューからリリースまでを支援する Codex 向けスキルです。**
+
+AI が問題を見つけ、修正を再確認します。レビュー担当者は、変更内容、実行したチェック、残っている判断事項をまとめて確認できます。既存の PR から始めることも、受け入れ条件の整理からリリースまで進めることもできます。
+
+Claude Code チームの早期レビュー、レビュー回数の上限、重要なコードの解説を参考にしています。 [Claude Code チームのコードレビュー](https://claude.dev/blog/solving-code-review-at-anthropic/)
 
 - **AI レビュー**では差分と関連する呼び出し経路を調べ、問題箇所、発生条件、影響、確認方法を示します。作成者が指摘を確認して修正し、レビュー担当が再確認します。既定では PR ごとに最大 3 回です。3 回目でもマージを妨げる問題が残る場合は、自動修正を止め、原因と次の対応案を示します。 [AI レビューの手順](references/pr-workflow.md)
 - **人によるレビュー**では、動作の変更点、重要なコード、差分全体、実際の検証結果、残るリスクを確認します。承認、修正依頼、保留の判断を対象の PR とコミットにひも付けます。 [人によるレビューの資料](references/human-review.md)
