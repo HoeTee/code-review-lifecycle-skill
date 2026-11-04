@@ -2,7 +2,7 @@
 
 [English](../README.md) · [简体中文](README.zh-CN.md) · 日本語
 
-**PR のレビューからリリースまでを支援する Codex 向けスキルです。**
+**Codex、Claude Code、OpenCode で PR のレビューからリリースまでを支援するスキルです。**
 
 AI が問題を見つけ、修正を再確認します。レビュー担当者は、変更内容、実行したチェック、残っている判断事項をまとめて確認できます。既存の PR から始めることも、受け入れ条件の整理からリリースまで進めることもできます。
 
@@ -10,7 +10,7 @@ Claude Code チームの早期レビュー、レビュー回数の上限、重�
 
 ## インストールと使い方
 
-インストール後、Codex で「`$code-review-lifecycle` でこの PR をレビューし、現在のコミットの検証結果とマージ前に判断すべき点を示してください」と依頼します。既定の HTML 解説には別途レンダラーが必要です。スキル本体と参照資料は主に中国語です。 [インストールと使い方](../README.md#install-and-try-it) · [HTML レンダラー](https://github.com/QingYunA/answer-me-with-html#install)
+Codex では `$code-review-lifecycle`、Claude Code では `/code-review-lifecycle` を使います。OpenCode では `code-review-lifecycle` スキルの読み込みと、レビューしたい内容を依頼します。HTML レンダラーは同梱されており、Node.js 20 以上で動作します。スキル本体と参照資料は主に中国語です。 [インストールと使い方](../README.md#install-and-try-it) · [対応エージェント](../references/agent-support.md)
 
 ## レビューの流れ
 

@@ -89,7 +89,13 @@
 python /ABSOLUTE/SKILL/scripts/render_progress.py /ABSOLUTE/task.progress.json --output /ABSOLUTE/task.html
 ```
 
-进度页按 `answer-me-with-html` 的内容格式与模板生成，由已安装的 `am` CLI 完成排版，不手写 HTML/CSS 模仿。解释或方案页使用该 skill 的 Markdown 草稿与 render/patch 命令，不强行塞进进度 JSON。开始使用时核对当前可用的 Node.js 与 CLI，缺项才按需准备，后续复用。用户明确指定本次其他呈现时沿用其要求。
+进度页由随包的 `answer-me-with-html` CLI 完成排版。解释或方案页从 Markdown 草稿生成，使用同一随包入口。需要 Node.js 20 或更新版本。路径以当前加载的 `SKILL.md` 所在目录为准。
+
+```sh
+node /ABSOLUTE/SKILL/scripts/render_html.mjs render /ABSOLUTE/draft.md -o /ABSOLUTE/page.html --no-open --theme blueprint --mode light
+```
+
+需要修改已有页面的单个面板时，先用同一入口运行 `help patch`。需要编写草稿时，运行 `help format`。用户明确指定本次其他呈现时沿用其要求。
 
 状态源可保存选择，后续仍用上面同一条命令更新同一页面：
 
@@ -104,7 +110,7 @@ python /ABSOLUTE/SKILL/scripts/render_progress.py /ABSOLUTE/task.progress.json -
 
 未设置 renderer 时脚本默认使用 `answer-me-with-html`，默认主题为浅色图纸（`blueprint` / `light`）。正例：新任务未指定 presentation 时，页面首次打开即显示浅色图纸；更新旧任务时同步其 presentation，避免旧的卡片配置覆盖新偏好。用户明确要求内置独立模板时可设 `presentation.renderer` 为 `native`；不要为了省事绕开已确认的默认风格。
 
-脚本从既有状态生成简短的 `.view.md`，再调用已安装的 `am.mjs`；非标准安装位置可用 `presentation.am_cli` 指定。渲染不更改任务状态或证据时间。检查按当前事实前置，主页面只列前五项；其中的 command 片段保留代码和说明，人审时将本版本关键片段前置。完整文件、历史与检查仍链接到状态源。工具缺失时准确报缺项，不默默退回用户已否定的外观。
+脚本从既有状态生成简短的 `.view.md`，再调用同包的 `scripts/render_html.mjs`。已有状态仍可用 `presentation.am_cli` 指定自定义 CLI 路径。渲染不更改任务状态或证据时间。检查按当前事实前置，主页面只列前五项；其中的 command 片段保留代码和说明，人审时将本版本关键片段前置。完整文件、历史与检查仍链接到状态源。工具缺失时准确报缺项，不默默退回用户已否定的外观。
 
 短追问只更新有关说明或紧凑页，不反复重写整套状态与历史。阶段变化从同一状态源渲染一次；普通工具旁白无需渲染。已有工具满足需求时，不为每个阶段另写专用状态脚本。
 
