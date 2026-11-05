@@ -2,21 +2,91 @@
 
 [English](../README.md) · 简体中文 · [日本語](README.ja.md)
 
-**面向 Codex、Claude Code 和 OpenCode 的代码审查 skill。**
+**从本地改动到人工合并决定，让 AI 审查、返修和验证连成一条流程。**
 
-只需说「做下 code review」。Agent 先读适用的 `CLAUDE.md` 和 `REVIEW.md`，再识别本地改动或已有 PR。审查结果列出问题、验证证据和待人工决定项。
+Codex、Claude Code 和 OpenCode 共用一个 skill。它读取仓库规则、识别待审改动、核查受影响的行为，并在获得授权后跟进修复和复审。
 
-流程参考了 Claude Code 团队的早期审查、审查轮次上限和关键代码解释做法。 [Claude Code 团队的代码审查实践](https://claude.dev/blog/solving-code-review-at-anthropic/)
+只需说「做下 code review」。可以从尚未创建 PR 的本地改动开始，也可以处理已有 PR，或继续审查返修后的版本。Agent 自动确定对象，从对应阶段继续。
+
+[📦 安装](#安装与试用) · [🧭 流程](#审查流程) · [🔎 能力](#能做什么) · [📄 示例](#示例)
 
 ## 安装与试用
 
-Codex 用 `$code-review-lifecycle`。Claude Code 用 `/code-review-lifecycle`。在 OpenCode 中，请它加载 `code-review-lifecycle` skill，再说明任务。例如，请它审查当前改动。HTML 渲染器随包提供，需要 Node.js 20 或更新版本。 [安装与试用](../README.md#install-and-try-it) · [Agent 支持](../references/agent-support.md)
+在项目目录运行，需要 Git 和 Node.js 22.20 或更新版本，以满足 `skills` 安装器要求。`--agent` 后只保留你使用的 Agent；添加 `--global` 可安装到用户范围。
+
+```sh
+npx skills add HoeTee/code-review-lifecycle-skill --agent codex claude-code opencode
+```
+
+| Agent | 如何开始 |
+| --- | --- |
+| Codex | 调用 `$code-review-lifecycle`。 |
+| Claude Code | 输入 `/code-review-lifecycle`，随后写明请求。 |
+| OpenCode | 请它加载 `code-review-lifecycle` skill，再说明任务。 |
+
+> 使用 code-review-lifecycle skill，做下 code review。
+
+PR 和 CI 操作沿用现有仓库权限。随包 HTML 渲染器需要 Node.js 20 或更新版本。 [安装说明](../README.md#install-and-try-it) · [Agent 支持](../references/agent-support.md)
 
 ## 审查流程
 
-- **AI 审查**检查 diff 和相关调用链，给出问题位置、触发条件、影响和验证办法。作者核实并修复，审查者复核。默认每个 PR 最多三轮。第三轮仍有阻断项时，暂停自动返修，说明原因并提出下一步。 [AI 审查流程](../references/pr-workflow.md)
-- **人工审核**看行为变化、关键代码、完整 diff、实际检查结果和剩余风险。审核人明确选择通过、要求修改或暂缓，结论绑定对应 PR 和提交。 [人工审核材料](../references/human-review.md)
+| 阶段 | 需要回答的问题 | 阶段结果 |
+| --- | --- | --- |
+| **1. PR 前** | 改了什么，可能影响哪里？ | 明确的审查范围、已核实发现和本地检查结果。 |
+| **2. PR 审查中** | 当前提交里的修复是否有效？ | 问题处理结果、相关复验，以及与受审版本对应的 PR 和 CI 证据。 |
+| **3. 合并前** | 人是否已有足够依据作决定？ | 关键代码、剩余风险、待判断项和明确的人工结论。 |
+
+可以从任一阶段进入。默认只读审查；修复、推送、发表评论等写入操作，需要有对应授权。
+
+### 1. PR 前：审查本地改动
+
+先读取适用的 `CLAUDE.md` 和 `REVIEW.md`。规则及其引用文件从同一可信基线加载；候选版本对规则的修改也属于受审内容。
+
+自动识别暂存、未暂存、相关新文件和分支已提交改动。工作区干净也会比较当前分支与正确基线，无需用户列出所有文件和 Git 命令。
+
+沿调用方、消费方、共享状态和失败路径核查影响，运行适用检查或核对已有证据。宿主支持时，使用与作者分开的上下文独立审查。每项发现说明位置、触发条件、后果和验证依据。 [审查对象与规则](../references/review-target.md)
+
+### 2. PR 审查中：验证、返修与复审
+
+固定受审 PR 的 base 和 head，读取 CI、失败日志、审查意见及线程状态。旧提交上的绿色检查不能证明当前版本已验证。
+
+获准返修后，先核实问题，再处理确认的问题和范围内的同类实例，复跑受影响检查。复审比较上次受审提交与新提交；基线或影响范围变化时，重新核对完整 diff。
+
+每个 PR 默认最多完成三轮 AI 审查，阻断项清除就结束。第三轮仍有阻断项时，暂停自动返修，说明卡在哪里并提出下一步。 [PR 审查与复审](../references/pr-workflow.md)
+
+### 3. 合并前：让人清楚地作决定
+
+必需技术检查和阻断项处理完成后，整理人工审核材料：修改前后行为、关键代码与调用链、实际检查结果、未验证范围和待判断项，同时保留完整 diff 与源码入口。
+
+人明确选择通过、要求修改或暂缓，结论绑定对应 PR 和提交。新改动影响原结论时，重新验证并复核相关部分。平台要求的人工审批按仓库规则完成。 [人工审核材料](../references/human-review.md)
+
+流程参考了 Claude Code 团队的早期审查、审查轮次上限和关键代码解释做法。 [Claude Code 团队的代码审查实践](https://claude.dev/blog/solving-code-review-at-anthropic/)
+
+## 能做什么
+
+| 能力 | 在审查中的作用 |
+| --- | --- |
+| **自动确定审查范围** | 选择本地候选或已有 PR，确认比较基线，纳入相关未跟踪文件。 |
+| **调用链与影响分析** | 沿输入、共享接口、状态变化、下游消费方和失败传播检查，超出 diff 行本身。 |
+| **独立 AI 审查** | 能力可用时使用独立上下文，核实发现，区分新增缺陷、存量问题和待验证疑点。 |
+| **按行为选择验证** | 选择相关单元、接口、集成、端到端、构建和真实任务检查，记录实际执行与未验证范围。 |
+| **返修后复审** | 核对修复行为和相关影响，保留仍有效的证据，限制重复审查轮次。 |
+| **PR 与 CI 证据核对** | 将检查和结论对应到当前提交，核对线程解决是否有实际修复依据。 |
+| **面向人的代码解释** | 说明为什么改、代码如何工作，以及哪些问题需要人判断。 |
+| **进度与上下文恢复** | 用同一 HTML 报告跟踪版本、阶段、证据、卡点和下一步，恢复任务时复用仍适用的上下文。 |
+
+验证跟随行为变化和仓库要求。产品界面可按要求截图；生成的说明页和审查报告核对内容与链接，不做截图验收。
+
+这些能力由 coding agent 使用当前可用工具执行。独立审查需要分开的审查上下文，远端操作需要平台权限；CI 和审批门槛以仓库实际配置为准。 [验证方法](../references/verification.md) · [进度报告](../references/progress-interaction.md) · [上下文与证据复用](../references/execution-efficiency.md)
 
 ## 示例
 
-例如，AI 发现导出任务在排队后没有重新检查权限。作者修复后用回归测试确认权限撤回时不会生成文件。人再根据实际行为决定，现有的提示语是否足够清楚。 [查看示例](../README.md#example-review)
+用户提交 CSV 导出任务后，在 Worker 执行前失去了访问权限。AI 沿请求追到 Worker，发现它仍然可以生成文件。
+
+获准修复后，作者补上执行时的权限检查和回归测试，确认权限撤回后不会生成文件。复审核对修复及对应提交的 CI 结果。人再判断 `Export unavailable` 是否向用户解释清楚了结果。 [查看示例与预览](../README.md#example-review)
+
+## 进一步了解
+
+[共享入口 SKILL.md](../SKILL.md) · [仓库资料导航](../README.md#repository-guide) · [验证场景](../references/validation-scenarios.md)
+
+项目自身的工作采用 [MIT License](../LICENSE)。
