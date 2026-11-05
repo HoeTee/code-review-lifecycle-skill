@@ -29,4 +29,6 @@ Codex、Claude Code 和 OpenCode 共用此入口。用户只需说「做下 code
 
 HTML 使用随包的 `scripts/render_html.mjs`，需要 Node.js 20 或更新版本。默认浅色图纸。任务更新沿用固定入口。缺少运行环境或渲染失败时，说明缺项并继续给出聊天结果。命令、状态格式和交互见 [进度与交互](references/progress-interaction.md)。
 
+截图和视觉验收用于被审查产品的界面。`answer-me-with-html` 生成的说明页、进度页和审查报告不做截图或视觉验收，按 [页面检查规则](references/progress-interaction.md#核对页面) 核对生成结果。
+
 维护此 skill 时使用 [验证场景](references/validation-scenarios.md) 核对范围选择、规则来源、复审与证据。
