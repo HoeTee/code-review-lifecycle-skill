@@ -493,5 +493,146 @@ class ReviewCLITests(unittest.TestCase):
         self.assertFalse(any('candidate-image' in attrs.get('src', '') for tag, attrs in parser.tags if tag == 'img'))
 
 
+    def test_direct_verification_preserves_argv_environment_counts_and_reuse(self):
+        self.write('.gitignore', 'result.json\n')
+        self.prepare()
+        code = ("import json,os,sys; from pathlib import Path; "
+                "assert os.environ['CRL_LITERAL']=='a=b with spaces'; "
+                "assert sys.argv[1:]==['--plan','literal | argument']; "
+                "Path('result.json').write_text(json.dumps({'run':3,'failures':0,'errors':0,'skipped':[]}))")
+        first = self.call('verify', '--env', 'CRL_LITERAL=a=b with spaces', '--timeout-ms', '30000',
+                          '--result', 'result.json', '--', sys.executable, '-B', '-c', code, '--plan', 'literal | argument')
+        self.assertEqual(first['checks'][0]['results'][0]['counts']['passed'], 3)
+        self.assertEqual(self.call('verify')['checks'][0]['status'], 'passed')
+        self.assertFalse((self.root/'plan.json').exists())
+
+    def test_direct_verification_rejects_mixed_or_incomplete_inputs_without_execution(self):
+        self.prepare()
+        marker = self.root/'unexpected.txt'
+        code = f"from pathlib import Path; Path({str(marker)!r}).write_text('executed')"
+        plan = self.plan(code)
+        for args in [('--plan', plan, '--', sys.executable, '-c', code),
+                     ('--env', 'BAD', '--', sys.executable, '-c', code),
+                     ('--env', 'SAME=1', '--env', 'SAME=2', '--', sys.executable, '-c', code),
+                     ('--timeout-ms', 'Infinity', '--', sys.executable, '-c', code),
+                     ('--result', 'result.json'), ('--',)]:
+            with self.subTest(args=args):
+                self.call('verify', *args, expected=2)
+                self.assertFalse(marker.exists())
+
+    def test_direct_result_failures_are_not_hidden_by_successful_exit(self):
+        self.write('.gitignore', 'result.json\n')
+        self.prepare()
+        code = "from pathlib import Path; Path('result.json').write_text('{\"run\":2,\"failures\":1,\"errors\":0,\"skipped\":[]}')"
+        result = self.call('verify', '--result', 'result.json', '--', sys.executable, '-B', '-c', code, expected=1)
+        self.assertEqual(result['checks'][0]['status'], 'failed')
+        self.assertEqual(result['checks'][0]['results'][0]['counts']['failures'], 1)
+
+    def test_atomic_record_render_validate_do_not_repeat_checks_or_reviews(self):
+        self.write('.gitignore', 'count.txt\n')
+        prepared = self.prepare()
+        self.assertIn('finding_fields', prepared['next'])
+        code = "from pathlib import Path; p=Path('count.txt'); p.write_text(str(int(p.read_text())+1) if p.exists() else '1')"
+        self.call('verify', '--', sys.executable, '-B', '-c', code)
+        review = json.loads(Path(prepared['review_input']).read_text(encoding='utf-8'))
+        review.update(summary='Independent review with a confirmed access defect.', independent=True,
+                      findings=[{'priority':'P1','title':'Check ownership','location':'feature.py:1',
+                                 'trigger':'Another user requests this value.','impact':'The value is disclosed.',
+                                 'evidence':'Synthetic fixture; the recorded source is feature.py.'}],
+                      key_code=[{'path':'feature.py','start_line':1,'end_line':1,'explanation':'The current value.'}])
+        self.record(review)
+        output = self.root/'atomic.html'
+        self.assertFalse(output.exists())
+        state = json.loads(self.state.read_text(encoding='utf-8'))
+        finding = state['reviews'][0]['data']['findings'][0]
+        self.assertEqual((finding['id'],finding['status'],finding['blocking']), ('finding-1','open',True))
+        self.assertEqual(state['reviews'][0]['data']['key_code'][0]['code'], 'VALUE = 1')
+        rendered = self.call('render', '--output', output)
+        self.assertIsNone(rendered['validation'])
+        self.assertFalse(rendered['ready_for_final_check'])
+        original = output.read_bytes()
+        self.call('validate', '--output', output)
+        self.call('validate', '--output', output)
+        self.assertEqual(output.read_bytes(), original)
+        self.assertEqual((self.repo/'count.txt').read_text(), '1')
+        state = json.loads(self.state.read_text(encoding='utf-8'))
+        self.assertEqual(len(state['reviews']), 1)
+        self.assertEqual(len(state['checks']), 1)
+        self.assertIsNone(state['human'])
+        self.assertTrue(self.record(review)['duplicate'])
+
+    def test_validate_rejects_modified_page_and_new_recorded_evidence(self):
+        self.prepare()
+        self.record(self.review())
+        output = self.root/'report.html'
+        self.call('render', '--output', output)
+        original = output.read_bytes()
+        output.write_bytes(original+b'<!-- altered -->')
+        self.assertIn('changed since rendering', self.call('validate', '--output', output, expected=2)['error'])
+        output.write_bytes(original)
+        self.record(self.review('review-2'))
+        self.assertIn('evidence changed', self.call('validate', '--output', output, expected=2)['error'])
+        self.call('render', '--output', output)
+        self.call('validate', '--output', output)
+        self.write('feature.py', 'VALUE = 9\n')
+        self.assertIn('candidate changed', self.call('validate', '--output', output, expected=2)['error'])
+
+    def test_atomic_record_cannot_default_away_blockers_or_accept_risk(self):
+        self.prepare()
+        base = {'priority':'P1','title':'Access defect','location':'feature.py:1','trigger':'Cross-user read.',
+                'impact':'Disclosure.','evidence':'Source fixture.'}
+        for extra in ({'blocking':False}, {'status':'accepted_risk'}):
+            with self.subTest(extra=extra):
+                review = self.review()
+                review['findings'] = [{**base, **extra}]
+                self.record(review, expected=2)
+        self.assertEqual(self.call('status')['completed_reviews'], 0)
+
+    def test_direct_verification_keeps_missing_result_counts_unknown_or_failed(self):
+        self.prepare()
+        plain = self.call('verify', '--', sys.executable, '-B', '-c', 'print("no count result")')
+        self.assertEqual(plain['checks'][0]['results'], [])
+        missing = self.call('verify', '--result', 'absent.json', '--', sys.executable, '-B', '-c', 'pass', expected=1)
+        self.assertEqual(missing['checks'][0]['results'][0]['status'], 'unavailable')
+
+    def test_report_sidecar_cannot_overwrite_tracked_source(self):
+        self.write('.gitignore', '*.html\n')
+        self.write('report.html.crl.json', 'USER_SOURCE_DO_NOT_OVERWRITE\n')
+        self.git('add', '.')
+        self.git('commit', '-m', 'source file beside an ignored HTML output')
+        self.prepare()
+        output = self.repo/'report.html'
+        for command in ('render', 'report'):
+            with self.subTest(command=command):
+                self.call(command, '--output', output, expected=2)
+                self.assertEqual((self.repo/'report.html.crl.json').read_text(), 'USER_SOURCE_DO_NOT_OVERWRITE\n')
+                self.assertFalse(output.exists())
+        self.assertEqual(self.git('status', '--porcelain').strip(), '')
+
+    def test_render_requires_validation_before_claiming_final_check_readiness(self):
+        self.prepare()
+        self.call('verify', '--', sys.executable, '-B', '-c', 'pass')
+        self.record(self.review())
+        output = self.root/'ready.html'
+        rendered = self.call('render', '--output', output)
+        self.assertTrue(rendered['technical_checks_ready'])
+        self.assertTrue(rendered['validation_required'])
+        self.assertFalse(rendered['ready_for_final_check'])
+        self.assertTrue(self.call('validate', '--output', output)['ready_for_final_check'])
+
+    def test_report_manifest_cannot_collide_with_task_state(self):
+        self.state = self.root/'collision.html.crl.json'
+        prepared = self.prepare()
+        output = self.root/'collision.html'
+        for command in ('render', 'report'):
+            with self.subTest(command=command):
+                result = self.call(command, '--output', output, expected=2)
+                self.assertIn('cannot overwrite state', result['error'])
+                state = json.loads(self.state.read_text(encoding='utf-8'))
+                self.assertEqual(state['task_id'], prepared['task_id'])
+                self.assertEqual(state['schema_version'], 1)
+                self.assertFalse(output.exists())
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -14,8 +14,11 @@ const HELP = `Code Review Lifecycle tools (Node.js 20+; no model calls)
 Usage: node scripts/crl.mjs <command> --state /absolute/task.json [options]
   prepare  --repo PATH [--base REF] [--rules-ref REF] [--pr-file JSON]
            [--read-only] [--refresh]
-  verify   --plan JSON                 run explicit argv-based checks
-  finish   [--file REVIEW] --output HTML
+  verify   [--result JSON] -- EXE ARGS  run one explicit check; no plan file needed
+           --plan JSON                 advanced multi-check plan
+  render   --output HTML               render saved evidence only
+  validate --output HTML               check an existing report only
+  finish   [--file REVIEW] --output HTML (existing callers)
                                        record review, check state, render and check report
   record   --file JSON                 record review, imported check, or human decision
            --usage-file JSON           import normalized host-reported token usage
@@ -33,7 +36,10 @@ const COMMAND_HELP = {
 Returns pinned diff/rule paths and review_input, an editable JSON template.
 Read the full applicable rules and diff. Fill semantic conclusions in the template.
 `,
-  verify: `verify --plan JSON (later calls reuse the saved plan)
+  verify: `verify [--check-name NAME] [--env KEY=VALUE] [--timeout-ms N] [--result JSON] -- EXE ARGS
+Runs explicit argv without a shell. Repeated --env/--result are allowed.
+--result uses root run/failures/errors/skipped fields; unknown schemas need --plan.
+Later verify calls reuse the saved command. --plan JSON supports multiple/custom checks.
 {"checks":[{"name":"unit","argv":["python","-m","unittest"],"env":{"PYTHONDONTWRITEBYTECODE":"1"},"results":[{"path":"results.json","fields":{"run":"/run","failures":"/failures","errors":"/errors","skipped":"/skipped"}}]}]}
 env and results are optional. Result paths are relative to check cwd; fields are explicit JSON pointers.
 Missing, unchanged, invalid or failing required results fail the check; unknown counts stay unknown.
@@ -48,15 +54,30 @@ One call records the round/checks, checks the candidate, renders and validates H
 Render failures keep the completed review. Retry the same input without prepare; it does not add a round.
 No human approval is recorded. Findings and failed checks remain visible.
 `,
+  record: `record --file REVIEW_INPUT (or an explicit check/human/rules record)
+Review: retain prepare's id/candidate_id; fill summary, independent and findings.
+Finding: priority, title, location, trigger, impact, evidence. ID/open/blocking defaults are automatic.
+key_code may use path/start_line/end_line/explanation; source is captured by this command.
+Records only: no checks are executed and no report is rendered.
+`,
+  render: `render --output HTML
+Build HTML and its .crl.json validation manifest from saved evidence only.
+Does not add reviews or rerun checks. Run validate before delivery.
+`,
+  validate: `validate --output HTML
+Check the existing page, manifest, candidate, recorded evidence and local links.
+Does not render, rerun checks, record reviews or grant approval.
+`,
 };
 const optionTypes = {
   state: 'string', repo: 'string', base: 'string', 'rules-ref': 'string',
   'pr-file': 'string', plan: 'string', file: 'string', 'usage-file': 'string',
+  env: 'string', result: 'string', 'check-name': 'string', 'timeout-ms': 'string',
   output: 'string', 'usage-format': 'string', 'turn-id': 'string', refresh: 'boolean', 'read-only': 'boolean',
   details: 'boolean', pretty: 'boolean', json: 'boolean', help: 'boolean',
 };
 const started = performance.now();
-let values, command;
+let values, command, checkArgv = [];
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
 const stableJSON = value => JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item)
@@ -269,7 +290,14 @@ function prepare(state, statePath) {
     head_sha: state.candidate.head_sha, base_sha: state.target.base_sha, rules_sha: state.target.rules_sha,
     base_confirmed: state.target.base_confirmed, files: state.candidate.files,
     diff: state.candidate.diff, untracked: state.candidate.untracked,
-    rules: state.candidate.rules, remaining_reviews: 3 - state.reviews.length } };
+    rules: state.candidate.rules, remaining_reviews: 3 - state.reviews.length,
+    next: { verify: 'verify [--env KEY=VALUE] [--timeout-ms N] [--result JSON] -- EXE ARGS',
+      result_fields: 'Root run/failures/errors/skipped; custom schemas use --plan.',
+      review_fields: ['summary', 'independent', 'findings'],
+      finding_fields: ['priority', 'title', 'location', 'trigger', 'impact', 'evidence'],
+      finding_defaults: { id: 'finding-1, finding-2, ...', status: 'open', blocking: 'true for P0/P1; false for P2 unless specified' },
+      delivery: ['record --file REVIEW_INPUT', 'render --output HTML', 'validate --output HTML'],
+      note: 'Reuse the current node/CLI/--state prefix. Batch known sequential actions in one host call; do not reread CLI docs or state for normal use.' } } };
 }
 function integer(value, name) { assert(Number.isSafeInteger(value) && value >= 0, `${name} must be a nonnegative safe integer`); return value; }
 function usageRecord(state, filename) {
@@ -298,7 +326,8 @@ function recordResult(state, statePath, supplied = null, candidate = null) {
     assert(Boolean(values.file) !== Boolean(values['usage-file']), 'Supply exactly one of --file or --usage-file');
     if (values['usage-file']) return usageRecord(state, values['usage-file']);
   }
-  const data = supplied ?? readJSON(values.file);
+  const source = supplied ?? readJSON(values.file);
+  const data = source.type === 'review' ? materializeReview(state, source) : source;
   text(data.id, 'id');
   const recordHash = digest(stableJSON(data)), prior = own(state.record_index, data.id);
   if (prior) {
@@ -391,9 +420,32 @@ function validatePlan(plan) {
     resultSpecs(check.results);
   }
 }
+function verificationPlan(state) {
+  const directOptions = ['env', 'result', 'check-name', 'timeout-ms'].some(key => values[key] != null);
+  assert(!values.plan || (!checkArgv.length && !directOptions), 'Use either --plan or a direct command, not both');
+  if (!checkArgv.length) {
+    assert(!directOptions, 'Direct-check options require -- EXE ARGS');
+    return values.plan ? readJSON(values.plan) : state.plan;
+  }
+  const env = {}, names = new Set();
+  for (const item of values.env ?? []) {
+    const split = item.indexOf('='), key = item.slice(0, split), value = item.slice(split + 1);
+    assert(split > 0, '--env needs KEY=VALUE');
+    const identity = process.platform === 'win32' ? key.toLowerCase() : key;
+    assert(!names.has(identity), 'Duplicate --env key'); names.add(identity); setOwn(env, key, value);
+  }
+  const check = { name: values['check-name'] ?? 'project-check', argv: checkArgv, env };
+  if (values['timeout-ms'] != null) {
+    assert(/^[1-9]\d*$/.test(values['timeout-ms']), '--timeout-ms must be a positive integer');
+    check.timeout_ms = Number(values['timeout-ms']);
+  }
+  if (values.result) check.results = values.result.map(filename => ({ path: filename,
+    fields: Object.fromEntries(['run', 'failures', 'errors', 'skipped'].map(key => [key, `/${key}`])) }));
+  return { checks: [check] };
+}
 function verify(state, statePath) {
-  const plan = values.plan ? readJSON(values.plan) : state.plan;
-  assert(plan, 'Supply --plan for the first verification'); validatePlan(plan);
+  const plan = verificationPlan(state);
+  assert(plan, 'Supply -- EXE ARGS or --plan for the first verification'); validatePlan(plan);
   const captured = current(state); sameTaskTree(state, captured);
   if (captured.id !== state.candidate.id && state.reviews.length >= 3 && state.reviews.at(-1).data.findings.some(item => item.status === 'open' && item.blocking)) {
     throw new Error('Review budget exhausted with blockers; stop automatic repair and present a replan');
@@ -497,10 +549,27 @@ function status(state, captured = current(state)) {
 }
 const md = value => String(value ?? '').replace(/[&<>]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[char]).replace(/[\\`*_[\]{}|#!]/g, '\\$&').replace(/\r?\n/g, ' ');
 const fileLink = (label, filename) => `[${md(label)}](${pathToFileURL(filename).href})`;
-function report(state, statePath, captured = current(state)) {
+const reportIdentity = state => {
+  const { commands, updated_at, ...content } = state;
+  return digest(stableJSON(content));
+};
+function validateReport(state, captured = current(state)) {
+  const output = safeArtifact(state.target.repo, text(values.output, '--output'));
+  const manifest = readJSON(`${output}.crl.json`);
+  assert(manifest.candidate_id === captured.id,
+    'Report candidate changed; render the current recorded evidence first');
+  assert(manifest.state_identity === reportIdentity(state), 'Recorded evidence changed since rendering; render again');
+  assert(manifest.output_sha256 === hashFile(output), 'Report changed since rendering');
+  const validation = checkReport(output, manifest.expected);
+  assert(current(state).id === captured.id, 'Candidate changed during report validation');
+  return { output, candidate_id: captured.id, validation, ready_for_final_check: status(state, captured).ready_for_final_check };
+}
+function report(state, statePath, captured = current(state), validate = true) {
   text(values.output, '--output');
   const output = safeArtifact(state.target.repo, values.output);
-  assert(pathKey(output) !== pathKey(statePath) && !pathKey(output).startsWith(`${pathKey(statePath)}.`), 'Report cannot overwrite state or its evidence');
+  const manifestPath = safeArtifact(state.target.repo, `${output}.crl.json`);
+  for (const filename of [output, manifestPath]) assert(pathKey(filename) !== pathKey(statePath)
+    && !pathKey(filename).startsWith(`${pathKey(statePath)}.`), 'Report cannot overwrite state or its evidence');
   const view = status(state, captured), stats = tokenStats(state), review = state.reviews.at(-1)?.data;
   const lines = ['---', 'title: Code review lifecycle', 'subtitle: Recorded review evidence and final human check', 'template: doc', 'theme: blueprint', 'mode: light', 'lang: en', '---',
     '## A Review status', `PR: ${md(state.target.pr?.url ?? 'Local candidate')}`, `Commit: ${md(view.head_sha)}`,
@@ -553,25 +622,20 @@ function report(state, statePath, captured = current(state)) {
   try {
     const result = spawnSync(process.execPath, [path.join(SCRIPT_DIR, 'render_html.mjs'), 'render', draft, '-o', temporary, '--no-open', '--theme', 'blueprint', '--mode', 'light'], { encoding: 'utf8', windowsHide: true, maxBuffer: 8 * 1024 * 1024 });
     assert(!result.error && result.status === 0, `Report renderer failed: ${result.stderr ?? result.error?.message ?? ''}`);
-    validation = checkReport(temporary, expected);
+    validation = validate ? checkReport(temporary, expected) : null;
     assert(current(state).id === captured.id, 'Candidate changed during report generation; evidence remains tied to its original candidate');
     atomicWrite(output, fs.readFileSync(temporary));
+    atomicWrite(manifestPath, `${JSON.stringify({ candidate_id: captured.id, state_identity: reportIdentity(state),
+      output_sha256: hashFile(output), expected })}\n`);
   } finally { if (fs.existsSync(temporary)) fs.unlinkSync(temporary); }
-  return { output, draft, candidate_id: view.current_candidate_id, ready_for_final_check: view.ready_for_final_check, validation, model_usage: stats.model_usage };
+  return { output, draft, candidate_id: view.current_candidate_id, ready_for_final_check: validate && view.ready_for_final_check,
+    technical_checks_ready: view.ready_for_final_check, validation_required: !validate, validation, model_usage: stats.model_usage };
 }
-function finish(state, statePath) {
-  text(values.output, '--output');
-  safeArtifact(state.target.repo, values.output);
-  const inputPath = values.file ?? state.review_input ?? `${statePath}.review.json`;
-  assert(pathKey(values.output) !== pathKey(inputPath), 'Report cannot overwrite its review input');
-  assert(pathKey(inputPath) !== pathKey(`${statePath}.report.md`), 'Review input collides with the reserved report draft; use prepare\'s review_input');
-  const input = readJSON(inputPath);
-  assert(input.type === 'review', 'finish accepts a completed review only');
-  const captured = current(state);
-  sameTaskTree(state, captured);
-  assert(captured.id === state.candidate.id && input.candidate_id === captured.id, 'Review input must match the current prepared candidate');
-  assert(input.checks == null || Array.isArray(input.checks), 'review.checks must be an array');
+function materializeReview(state, input) {
   const data = structuredClone(input);
+  if (Array.isArray(data.findings)) data.findings = data.findings.map((finding, index) => ({
+    id: `finding-${index + 1}`, status: 'open', blocking: ['P0', 'P1'].includes(finding.priority), ...finding,
+  }));
   for (const item of data.key_code ?? []) {
     if (item.code != null) continue;
     text(item.path, 'key_code.path');
@@ -588,6 +652,21 @@ function finish(state, statePath) {
     item.code = source.slice(item.start_line-1, item.end_line).join('\n');
     item.location = `${item.path}:${item.start_line}`;
   }
+  return data;
+}
+function finish(state, statePath) {
+  text(values.output, '--output');
+  safeArtifact(state.target.repo, values.output);
+  const inputPath = values.file ?? state.review_input ?? `${statePath}.review.json`;
+  assert(pathKey(values.output) !== pathKey(inputPath), 'Report cannot overwrite its review input');
+  assert(pathKey(inputPath) !== pathKey(`${statePath}.report.md`), 'Review input collides with the reserved report draft; use prepare\'s review_input');
+  const input = readJSON(inputPath);
+  assert(input.type === 'review', 'finish accepts a completed review only');
+  const captured = current(state);
+  sameTaskTree(state, captured);
+  assert(captured.id === state.candidate.id && input.candidate_id === captured.id, 'Review input must match the current prepared candidate');
+  assert(input.checks == null || Array.isArray(input.checks), 'review.checks must be an array');
+  const data = materializeReview(state, input);
   const observations = data.checks ?? [];
   delete data.checks;
   const recorded = recordResult(state, statePath, data, captured);
@@ -606,11 +685,15 @@ function finish(state, statePath) {
   }
 }
 function main() {
-  const parsed = parseArgs({ options: Object.fromEntries(Object.entries(optionTypes).map(([key, type]) => [key, { type }])), allowPositionals: true });
+  const args = process.argv.slice(2), separator = args.indexOf('--');
+  const parsed = parseArgs({ args: separator < 0 ? args : args.slice(0, separator),
+    options: Object.fromEntries(Object.entries(optionTypes).map(([key, type]) => [key, { type, ...(['env', 'result'].includes(key) ? { multiple: true } : {}) }])), allowPositionals: true });
   values = parsed.values; command = parsed.positionals[0];
   if (values.help || !command || command === 'help') { process.stdout.write(COMMAND_HELP[command] ?? HELP); return; }
-  assert(['prepare', 'verify', 'finish', 'record', 'status', 'stats', 'report'].includes(command), 'Unknown command; use --help');
+  assert(['prepare', 'verify', 'finish', 'record', 'status', 'stats', 'report', 'render', 'validate'].includes(command), 'Unknown command; use --help');
   assert(parsed.positionals.length === 1, 'Unexpected positional arguments');
+  if (separator >= 0) { assert(command === 'verify', '-- EXE ARGS is only valid for verify'); checkArgv = args.slice(separator + 1); assert(checkArgv.length, 'Missing executable after --'); }
+  assert(command === 'verify' || !['env', 'result', 'check-name', 'timeout-ms'].some(key => values[key] != null), 'Direct-check options are only valid for verify');
   const statePath = path.resolve(text(values.state, '--state'));
   const existing = fs.existsSync(statePath) ? readJSON(statePath) : null;
   if (existing) { validateState(existing); safeArtifact(existing.target.repo, statePath); }
@@ -636,6 +719,8 @@ function main() {
         if (values.details) result.details = { candidate: state.candidate, reviews: state.reviews, checks: state.checks, human: state.human };
       } else if (command === 'stats') result = tokenStats(state);
       else if (command === 'report') result = report(state, statePath);
+      else if (command === 'render') result = report(state, statePath, current(state), false);
+      else if (command === 'validate') result = validateReport(state);
     } catch (error) { state = previousState; result = { error: error.message }; exitCode = 2; }
     const output = JSON.stringify(result, null, values.pretty ? 2 : 0) + '\n';
     if (state) {

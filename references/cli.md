@@ -1,6 +1,6 @@
 # 确定性工具 CLI 与 token 记录
 
-首次使用工具或需要输入格式时读取本节。CLI 不调用模型，不配置模型 API，也不判断代码缺陷是否成立。Agent 读取可信规则、理解代码并修复问题；CLI 执行取证、显式检查、结构校验、状态记录和渲染。
+多检查、自定义结果结构、外部记录或恢复任务时读取本节。正常单检查使用 prepare 的 next，无需先读本节。CLI 不调用模型，不配置模型 API，也不判断代码缺陷是否成立。Agent 读取可信规则、理解代码并修复问题；CLI 执行取证、显式检查、结构校验、状态记录和渲染。
 
 ## 入口与任务文件
 
@@ -8,13 +8,15 @@
 
 ```sh
 node /ABSOLUTE/SKILL/scripts/crl.mjs prepare --repo /ABSOLUTE/REPO --state /ABSOLUTE/task.json --base CONFIRMED_BASE
-node /ABSOLUTE/SKILL/scripts/crl.mjs verify --state /ABSOLUTE/task.json --plan /ABSOLUTE/checks.json
-node /ABSOLUTE/SKILL/scripts/crl.mjs finish --state /ABSOLUTE/task.json --output /ABSOLUTE/task.html
+node /ABSOLUTE/SKILL/scripts/crl.mjs verify --state /ABSOLUTE/task.json -- python -m unittest
+node /ABSOLUTE/SKILL/scripts/crl.mjs record --state /ABSOLUTE/task.json --file /ABSOLUTE/task.json.review.json
+node /ABSOLUTE/SKILL/scripts/crl.mjs render --state /ABSOLUTE/task.json --output /ABSOLUTE/task.html
+node /ABSOLUTE/SKILL/scripts/crl.mjs validate --state /ABSOLUTE/task.json --output /ABSOLUTE/task.html
 ```
 
 上面的路径与基线由 Agent 根据当前任务填写，用户无需提供这些技术参数。任务文件放在已约定的产物目录，位于工作树之外或 Git 忽略目录。状态、证据和页面分别存放；不写到源码文件。一个任务复用同一状态文件，多个任务分开保存。
 
-CLI 只更新自己的状态和证据。`verify` 执行的命令由 Agent 根据项目规则明确提供，仍须符合任务和宿主权限。CLI 不是沙箱，也不约束其它工具直接执行的操作。提交、推送、评论与合并沿用原授权。
+每条命令对应独立动作，不因保存记录而运行测试，不因检查页面而重新生成页面。record、render、validate 的固定依赖在一次宿主调用内依次执行，失败即停；不逐项回到模型决定固定的下一步。CLI 只更新自己的状态和证据。verify 的命令由 Agent 根据项目规则明确提供，仍须符合任务和宿主权限。CLI 不是沙箱。提交、推送、评论与合并沿用原授权。
 
 ## prepare：固定版本与规则证据
 
@@ -30,6 +32,8 @@ Agent 先识别用户明确关联的 PR、本地候选和可信比较基线，�
 
 同时返回 `review_input` 文件，已填写记录 ID 与候选 ID。直接补充语义内容，保留这些自动字段。空 summary 不能提交；`independent` 默认 false，确有独立上下文才改为 true。刷新未完成候选时保留同版本草稿；prepare 或 verify 捕获新候选后自动生成新稿并归档旧稿，轮次仍沿任务累计。
 
+`next` 返回正常命令的最小语法、发现字段和默认值。正常调用只需这些信息，不为寻找工具而读取源码或整份状态。
+
 `prepare --refresh` 更新同一任务的候选，保留审查历史和轮次；不得通过另建任务清零。本地修复后 `verify` 也会在原任务分支上捕获新候选，旧审查与旧检查不自动变为新版本证据。新基线、PR 元数据和规则来源的调整必须有对应事实或用户确认，不能借此降低规则。
 
 本地任务创建 PR 后，`prepare --refresh --pr-file ...` 关联该 PR；需匹配当前干净候选，不换任务或清零。取得新的可信基线或已确认的规则提交时，可在同一 refresh 中传入 `--base` 或 `--rules-ref`。规则身份参与候选 ID，受影响证据重新核对。
@@ -37,6 +41,16 @@ Agent 先识别用户明确关联的 PR、本地候选和可信比较基线，�
 已经使用手工计数的进行中任务继续沿用原记录，本轮不要为了换工具重新计数。新任务使用 CLI 后持续复用状态文件。
 
 ## verify：执行明确的检查计划
+
+一个已有检查不需要先写计划文件：
+
+```sh
+node /ABSOLUTE/SKILL/scripts/crl.mjs verify --state /ABSOLUTE/task.json --env PYTHONDONTWRITEBYTECODE=1 --timeout-ms 600000 --result data/results.json -- python scripts/check.py
+```
+
+这是接口示例，命令与路径由当前项目的真实入口替换。`--` 之后是原样 argv；不使用隐式 shell。重复 --env 接收多个明确变量；重复 --result 接收多个结果。每个指定 JSON 必须提供根 run/failures/errors/skipped，且本轮有更新；不会猜其他结构或日志内容。没有结果文件时省略 --result，计数保持未知。默认检查名为 project-check；需要分别保留不同检查时显式使用 --check-name。后续只调用 verify 复用已保存命令。
+
+多检查或自定义 JSON 结构才使用 `--plan`，不能与直接命令或其选项混用。计划格式如下。
 
 计划为 JSON 对象，包含非空 `checks` 数组。每项包括：
 
@@ -52,7 +66,7 @@ Agent 先识别用户明确关联的 PR、本地候选和可信比较基线，�
 
 命令不经隐式 shell。需要 shell 功能时，计划明确列出 shell 可执行文件及参数。Windows 的 `.cmd` 入口也应通过明确的宿主执行方式调用。CLI 不拼接不可信 shell 字符串。
 
-首次传入 `--plan`；后续 `verify` 可复用该计划。计划必须来自项目必需检查与 Agent 的语义判断，CLI 不会从自然语言生成测试。
+首次传入明确命令或 --plan；后续 verify 复用保存的计划。选择来自项目必需检查与 Agent 的语义判断，CLI 不会从自然语言生成测试。
 
 每次保存候选 ID、实际命令、退出状态、时间和 stdout/stderr。必需检查失败返回 1；输入或执行准备错误返回 2。检查改变候选内容时标为证据失效，不请求最终批准。CLI 只知道已登记的检查，Agent 还需核对项目和平台的完整要求。
 
@@ -60,17 +74,21 @@ Agent 先识别用户明确关联的 PR、本地候选和可信比较基线，�
 
 必需结果缺失、未更新、格式错误、计数矛盾、无测试或存在失败/错误时，检查失败。命令非零退出不能被 JSON 中的成功计数覆盖。跳过按实际数量报告；项目的必需集成检查仍按原命令与规则执行。未声明或未提供的计数保持未知。
 
-## finish：一次提交审查
+## record、render、validate：独立交付动作
 
-默认读取 `review_input`，也可用 `--file` 指定。Agent 填写 summary、independent、findings，以及需要的 key_code 和 checks，不重复抄写版本、命令、测试计数或完整状态。
+record --file 接收 prepare 的 review_input。Agent 填写 summary、independent、findings 及必要 key_code，不重复抄写版本、命令、测试计数或完整状态。每条发现填写 priority、title、location、trigger、impact、evidence；未给 ID 时按本轮顺序补入，status 默认 open，blocking 对 P0/P1 默认 true、P2 默认 false。项目契约要求阻断的 P2 需显式设置 true，不能用默认值放宽要求。P0/P1 的 open 发现不能显式改成不阻断，accepted_risk 仍需真实决定证据。
 
 `key_code` 可用 `{path,start_line,end_line,explanation}`，工具从同一候选提取 1 到 200 行原文；也兼容明确的 location/code/explanation。原文一律作为不可执行的文本展示。
 
-`checks` 可同时提交平台观察或明确未运行项，每项给 name、source、evidence、带时区的 observed_at、required 和 status。候选与默认 ID 自动补入，来源始终标为导入，不冒充 CLI 执行。
+平台观察或未运行项使用独立的 record check 格式，保持导入来源，不冒充 CLI 执行。
 
-一次 finish 记录该轮及观察，核对版本与状态，渲染报告并检查正文节点、计数、版本和本地证据链接，排除 head、源脚本及明确隐藏的子树，返回短摘要与路径。无需再逐个 record、status、report，也不另生成组织数据或检查 HTML 的脚本。这是结构和转录检查，不认证任意 CSS/JS 的最终可见性；语义和业务完整性仍需 Agent 核对。退出 0 表示报告成功交付，是否可进入最终人审看 ready_for_final_check，不能只看退出码。
+render 只用已保存的证据生成 HTML 和 `.crl.json` 校验清单，不增加审查轮次或运行测试。validate 只核对该 HTML 的哈希、记录身份、候选版本、正文与本地链接，不重渲染或运行测试。清单属于页面产物，不手工编辑。页面、记录或候选变化会拒绝旧验证；记录更新后重新 render，再 validate。检查排除 head、源脚本和明确隐藏的子树，仍不能认证任意 CSS/JS 的最终可见性或业务语义。退出 0 表示当前动作成功；是否可最终人审仍看 ready_for_final_check。
 
-渲染或页面核对失败时保存已完成轮次，修好问题后用同一输入重试 finish，不先 prepare 新草稿。重复内容不多计轮；输入或候选变化不能套用旧结论。工具不生成缺陷判断，也不记录人工批准。返修前保存已完成轮次，沿原三轮上限继续。
+渲染失败只重试 render；校验失败先定位原因，仅页面改变时重渲染，缺失证据先补证据，不重跑无关检查或重记审查。record 的相同输入重试不多计轮。工具不生成缺陷判断或人工批准；返修前保存已完成轮次，沿原三轮上限继续。
+
+## finish：已有调用兼容
+
+finish 保留原先记录、生成和检查的组合行为，report 保留重渲染并检查行为。新任务不以它们为默认入口，不把兼容调用再与独立动作叠加。finish 接收 review_input 及可选 checks，失败重试沿用同一输入，不重置轮次。
 
 ## record：增量记录，不代替判断
 
@@ -135,6 +153,6 @@ node /ABSOLUTE/SKILL/scripts/crl.mjs record --state /ABSOLUTE/task.json --usage-
 
 ## report 与恢复
 
-正常流程使用 finish；`report` 用于从已有记录重新渲染。报告复用随包渲染器，自动保留版本、P0/P1/P2、命令日志、测试结果快照、关键片段与人审状态。写入最终页面前检查实际正文与本地证据链接，并再次核对候选。失败保留上一份页面。自动结构检查不能代替语义核对，按 [页面检查](progress-interaction.md#核对页面) 补核当前任务内容，不做报告截图。
+正常交付分别使用 record、render、validate，已保存结论只重渲染时从 render 开始，不重记轮次或重跑检查。报告保留版本、P0/P1/P2、命令日志、结果快照、关键片段与人审状态。自动结构检查不能代替语义核对，按 [页面检查](progress-interaction.md#核对页面) 补核内容，不做报告截图。
 
 任务状态采用锁与原子替换。锁冲突时先核对锁中进程和归属；不要自动删除未知执行者的锁。失败记录保留实际状态，重试复用原任务和记录 ID。CLI 不能保证外部工具不改文件，执行前后仍核对候选。
