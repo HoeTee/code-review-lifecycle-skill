@@ -22,7 +22,7 @@ Codex、Claude Code 和 OpenCode 共用一份 Agent Skill。
   <img src="media/review-lifecycle-hero.webp" width="860" alt="代码差异、验证证据和人工审核决定连成一条审查流程。">
 </p>
 
-让 coding agent 审查一次改动。它先读取仓库规则，识别本地改动或已有 PR，再检查受影响的代码和行为。获得返修授权后，继续跟进修复、验证与复审。
+让 coding agent 审查一次改动。它先读取仓库规则，识别本地改动或已有 PR，再检查受影响的代码和行为。AI 阶段在本次范围内修复已确认缺陷，完成验证与复审，最后交给人检查。
 
 人工审核者看到关键代码、实际检查结果、剩余风险和明确的待决定项。每份证据都对应它实际检查的 PR 和提交。
 
@@ -52,15 +52,15 @@ npx skills add HoeTee/code-review-lifecycle-skill --agent codex claude-code open
 
 ## 审查流程
 
-![整个 Skill 的工作流：可信规则、固定范围与版本、AI 审查与授权返修、本地报告出口、PR 与 CI、人工决定及按授权合并交接。](media/review-workflow.png)
+![整个 Skill 的工作流：可信规则与固定范围，AI 审查、修复、验证和复审循环，当前 PR 与 CI，最后由人检查并交接合并。](media/review-workflow.png)
 
 *使用 Answer me with HTML 单独生成的工作流介绍图。[查看完整尺寸](media/review-workflow.svg) · [下载并本地打开 HTML 介绍页](showcase/review-workflow.html) · [内容源稿](showcase/review-workflow.md)。*
 
-1. **审查改动。** 读取可信仓库规则，固定审查范围与版本。AI 检查受影响代码并记录发现。
-2. **返修与验证。** 获准后修复确认的问题，再复审。必需检查对应当前提交。本地和 PR 审查默认合计最多三轮 AI 审查。
-3. **交给人决定。** 检查通过、阻断清除后，展示关键代码、发现、证据、风险和待判断项。人针对该版本选择通过、要求修改或暂缓。
+1. **确定审查范围。** 读取可信仓库规则，固定范围与版本。
+2. **由 AI 审查并修复。** AI 审查代码、修复范围内已确认缺陷、验证并复审。本地和 PR 审查默认合计最多三轮，常规修复不逐项等待人工批准。
+3. **最后由人检查。** 必需检查通过、阻断清除后，展示关键代码、发现、证据、风险和待判断项。人针对该版本选择通过、要求修改或暂缓。
 
-默认只读。本地审查可以在交付报告后结束。PR 写入和合并需要对应授权。CI 和 AI 结果不能代替人工批准。
+明确要求只读时只交报告、不修改。本地任务可在交付本地修复与报告后结束。提交、推送、PR 写入和合并需要对应授权。CI 和 AI 结果不能代替最终人工批准。
 
 [审查范围与规则](../references/review-target.md) · [审查与返修](../references/pr-workflow.md) · [人工审核](../references/human-review.md)
 
@@ -87,7 +87,7 @@ npx skills add HoeTee/code-review-lifecycle-skill --agent codex claude-code open
 
 用户提交 CSV 导出后，在 Worker 执行前失去访问权限。审查者沿请求追到 Worker，发现它仍能生成文件。
 
-获准返修后，作者补上执行时的权限检查和回归测试。复审确认权限撤回后不会生成文件，并核对对应提交的 CI。人再判断 `Export unavailable` 是否解释清楚了结果。
+Agent 补上执行时的权限检查和回归测试。复审确认权限撤回后不会生成文件，并核对对应提交的 CI。最后由人判断 `Export unavailable` 是否解释清楚了结果。
 
 ![虚构 PR 42、提交 a1b2c3d 的 HTML 审核报告示例，展示已处理的 AI 发现和待完成的人工决定。](media/export-review-preview.png)
 
@@ -123,7 +123,7 @@ node scripts/render_html.mjs render docs/showcase/export-review.md -o export-rev
 <details>
 <summary><strong>会修改代码或推送 GitHub 吗？</strong></summary>
 
-默认只读。你可以授权修复、更新 PR 或其他写入。每项操作都受对应授权和仓库权限约束。
+默认流程包含本次范围内已确认缺陷的本地修复、验证与复审。明确要求只读时不修改。提交、推送、PR 更新和合并需要对应授权及仓库权限。
 
 </details>
 
