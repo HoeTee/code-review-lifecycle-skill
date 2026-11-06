@@ -52,30 +52,72 @@ Start with local changes, an open PR, or a revised commit. The agent determines 
 
 ## Workflow
 
-| Before a PR | During PR review | Before merge |
-| --- | --- | --- |
-| Read the rules and identify the change. | Verify findings, fix with authorization, and re-review. | Give a person the evidence to decide. |
-| **Result:** review scope, findings, and local evidence. | **Result:** revision checks and CI matched to the reviewed commit. | **Result:** a review brief and an explicit human decision. |
+**Request a review → read trusted rules → identify the change → AI review ↔ authorized fixes → PR checks → human decision → merge handoff.**
 
-You can enter at any stage. Reviews are read-only by default. Fixes, pushes, comments, and other platform writes need authorization for the corresponding action.
+You can start with local changes or an existing PR. A local-only request ends with a review report. PR creation, updates, and merging require authorization for those actions.
 
-### 1. Before a PR: understand the change
+The YAML below describes the agent's workflow. The agent follows [SKILL.md](SKILL.md) and the linked guides; this block is not an executable GitHub Actions configuration.
 
-Read the applicable `CLAUDE.md` and `REVIEW.md` before analyzing the diff. Load rules and their included files from the same trusted baseline. Changes to the rules are themselves part of the review.
+```yaml
+workflow:
+  trigger: "Ask your agent to review a change or PR"
+  default_mode: read_only
+  max_ai_review_rounds: 3  # One total across local review and the PR.
 
-Identify staged, unstaged, committed, and relevant untracked changes. Follow affected callers, consumers, shared state, and failure paths. Run applicable checks or inspect existing evidence. Use an independent review context when the host provides one. [Review scope and rules](references/review-target.md)
+  stages:
+    - id: read_rules
+      owner: agent
+      action: "Read trusted CLAUDE.md, REVIEW.md, and included rules"
+      if_root_rules_missing: "Draft missing rules; ask before writing; continue independent checks"
+      if_references_missing: "Report missing paths and affected checks"
 
-### 2. During PR review: check each revision
+    - id: identify_change
+      owner: agent
+      action: "Choose local changes or a PR; pin the base and reviewed version"
+      local_scope: "Include in-scope committed, staged, unstaged, and untracked changes"
+      pr_scope: "Review the pinned PR head; list extra local changes separately"
 
-Pin the PR base and head, then inspect CI, logs, findings, and discussion threads. Check that the evidence applies to the current version.
+    - id: ai_review
+      owner: independent_reviewer_when_available
+      action: "Review the full diff, affected callers, failure paths, and available checks"
+      output: "Verified P0/P1/P2 findings, evidence, and unresolved counts"
 
-With fixes authorized, verify each finding, fix confirmed problems in scope, and repeat the affected checks. Re-review the revised code and its effects. The AI review cycle ends when blockers clear, with up to three completed rounds by default. If blockers remain after round three, automatic fixes stop and the agent explains the remaining problem and proposes a next step. [Review and revision](references/pr-workflow.md)
+    - id: resolve_findings
+      owner: author_or_authorized_agent
+      with_fix_authorization: "Fix confirmed problems; rerun checks; return to ai_review"
+      without_fix_authorization: "Report findings and blockers; keep code unchanged"
+      on_repeated_failure: "If two fixes share a premise and fail the same check, test that premise"
+      after_round_three_with_blockers: "Stop automatic fixes; diagnose and propose options"
+      if_local_only: "Deliver the report and any authorized fixes; no PR is required"
 
-### 3. Before merge: put the decision in human hands
+    - id: pr_checks
+      owner: agent_and_ci
+      when: "A PR exists, or PR delivery is requested and authorized"
+      action: "Create or update only as authorized; match CI and threads to base/head"
+      on_new_code: "Return to ai_review within the same three-round total"
+      on_failed_or_missing_checks: "Resolve within authorization or report the blocker"
+      ready_when: "Required checks pass, evidence is sufficient, and no blockers remain"
 
-After required checks pass and blockers are addressed, prepare a brief with the behavior before and after the change, key code, actual evidence, unverified areas, and decisions still open. Keep the full diff and source available.
+    - id: human_review
+      owner: human
+      requires: "A PR and the ready_when conditions above"
+      input: "Exact commit, P0/P1/P2 summary, key code, evidence, risks, and decisions"
+      approve: "Record the decision for the reviewed version"
+      request_changes: "Return to authorized fixes and review within the remaining rounds"
+      defer: "Wait for the human decision; preserve the evidence"
 
-A person approves, requests changes, or defers. Record that decision against the PR and reviewed commit. New changes that affect the decision require the relevant checks and review again. Repository approval rules still apply. [Human review](references/human-review.md)
+    - id: merge_handoff
+      owner: authorized_merger
+      requires: "Human approval, passing checks, repository rules, and merge authorization"
+      on_changed_version: "Repeat affected checks and review; reconfirm affected decisions"
+      result: "Merge when authorized, or hand off with remaining merge conditions"
+```
+
+The round limit applies to every return to AI review. Creating a PR, changing methods, or resuming a session does not reset it. If further review would exceed the limit, stop the automatic loop and present a concrete plan for a decision. CI retries do not consume another review round.
+
+CI and AI review can run in parallel for an existing PR. Its available CI evidence is inspected during review; the final PR check confirms that all required results apply to the version sent to the human. Missing independent-review capability is reported as a limitation.
+
+[Review scope and trusted rules](references/review-target.md) · [Missing-rule drafts](references/review-rules.md) · [Review and revision](references/pr-workflow.md) · [Human review and P0/P1/P2](references/human-review.md)
 
 The workflow draws on the Claude Code team's practices for early review, bounded review rounds, and explanations of key code. [How the Claude Code team does code review](https://claude.dev/blog/solving-code-review-at-anthropic/)
 
