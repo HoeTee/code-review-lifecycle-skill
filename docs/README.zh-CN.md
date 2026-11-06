@@ -52,72 +52,17 @@ npx skills add HoeTee/code-review-lifecycle-skill --agent codex claude-code open
 
 ## 审查流程
 
-**发起审查 → 读取可信规则 → 确定改动 → AI 审查 ↔ 获准返修 → PR 检查 → 人工决定 → 合并交接。**
+![虚构 PR 42、提交 a1b2c3d 的 HTML 审核材料，展示 AI 发现、修复证据、CI 结果和待完成的人工决定。](media/export-review-preview.png)
 
-可以从本地改动或已有 PR 开始。只要求本地审查时，交付审查报告即可。创建 PR、更新 PR 和合并都需要对应授权。
+*随包 HTML 渲染器生成页面的截图。PR #42 和提交 a1b2c3d 为说明流程的虚构内容。[查看示例材料](showcase/export-review.md)。*
 
-下面的 YAML 描述 Agent 的工作流程。实际指令由 [SKILL.md](../SKILL.md) 和相关资料提供；这段内容不是可执行的 GitHub Actions 配置。
+1. **审查改动。** 读取可信仓库规则，固定审查范围与版本。AI 检查受影响代码并记录发现。
+2. **返修与验证。** 获准后修复确认的问题，再复审。必需检查对应当前提交。本地和 PR 审查默认合计最多三轮 AI 审查。
+3. **交给人决定。** 检查通过、阻断清除后，展示关键代码、发现、证据、风险和待判断项。人针对该版本选择通过、要求修改或暂缓。
 
-```yaml
-workflow:
-  trigger: "请 Agent 审查一次改动或 PR"
-  default_mode: read_only
-  max_ai_review_rounds: 3  # 本地审查到 PR 合计三轮。
+默认只读。本地审查可以在交付报告后结束。PR 写入和合并需要对应授权。CI 和 AI 结果不能代替人工批准。
 
-  stages:
-    - id: read_rules
-      owner: agent
-      action: "读取可信的 CLAUDE.md、REVIEW.md 及引用规则"
-      if_root_rules_missing: "给出缺失根规则的草案，写入前请用户确认；独立检查继续"
-      if_references_missing: "报告缺失路径和受影响的检查"
-
-    - id: identify_change
-      owner: agent
-      action: "选择本地改动或 PR，固定基线和受审版本"
-      local_scope: "纳入本次范围内的已提交、暂存、未暂存和未跟踪改动"
-      pr_scope: "审查固定的 PR head，本地额外改动另列"
-
-    - id: ai_review
-      owner: independent_reviewer_when_available
-      action: "检查完整 diff、受影响调用方、失败路径和可用检查"
-      output: "已核实的 P0/P1/P2 发现、证据和未解决数量"
-
-    - id: resolve_findings
-      owner: author_or_authorized_agent
-      with_fix_authorization: "修复确认的问题，复跑检查，再回到 ai_review"
-      without_fix_authorization: "报告发现和阻断项，不修改代码"
-      on_repeated_failure: "两次修复依赖同一前提且同一检查仍失败时，先验证该前提"
-      after_round_three_with_blockers: "停止自动返修，分析原因并提出方案"
-      if_local_only: "交付报告及已获准的修复，无需创建 PR"
-
-    - id: pr_checks
-      owner: agent_and_ci
-      when: "已有 PR，或用户要求并授权交付 PR"
-      action: "仅按授权创建或更新 PR，将 CI 和线程对应到 base/head"
-      on_new_code: "回到 ai_review，仍沿用合计三轮的限制"
-      on_failed_or_missing_checks: "在授权内处理，无法完成则报告阻断"
-      ready_when: "必需检查通过、证据充分且没有剩余阻断项"
-
-    - id: human_review
-      owner: human
-      requires: "已有 PR，且满足上面的 ready_when 条件"
-      input: "确切提交、P0/P1/P2 摘要、关键代码、证据、风险和待决定项"
-      approve: "记录针对受审版本的人工通过结论"
-      request_changes: "在剩余轮次内，回到已获准的返修和复审"
-      defer: "等待人工决定，保留证据"
-
-    - id: merge_handoff
-      owner: authorized_merger
-      requires: "人工通过、检查通过、满足仓库规则，并有合并授权"
-      on_changed_version: "重做受影响的检查和审查，重新确认受影响的人工决定"
-      result: "获准后合并，或交接并说明剩余合并条件"
-```
-
-每次返回 AI 审查都沿用原轮次。创建 PR、切换方法或恢复会话不重置计数。超过上限前停止自动循环，给出具体方案供决定。CI 重试不另算一轮审查。
-
-已有 PR 的 CI 与 AI 审查可以并行。审查时读取已有 CI 证据，最终 PR 检查再确认必需结果对应交给人审核的版本。缺少独立审查能力时，如实标明限制。
-
-[审查范围与可信规则](../references/review-target.md) · [缺失规则草案](../references/review-rules.md) · [审查与返修](../references/pr-workflow.md) · [人工审核与 P0/P1/P2](../references/human-review.md)
+[审查范围与规则](../references/review-target.md) · [审查与返修](../references/pr-workflow.md) · [人工审核](../references/human-review.md)
 
 流程参考 Claude Code 团队的早期审查、有限轮次和关键代码解释做法。[Claude Code 团队的代码审查实践](https://claude.dev/blog/solving-code-review-at-anthropic/)
 
@@ -144,9 +89,7 @@ workflow:
 
 获准返修后，作者补上执行时的权限检查和回归测试。复审确认权限撤回后不会生成文件，并核对对应提交的 CI。人再判断 `Export unavailable` 是否解释清楚了结果。
 
-![虚构 PR 42、提交 a1b2c3d 的审核示例：CI 通过、AI 阻断项已处理，人工决定待完成。](media/export-review-preview.png)
-
-*这是说明流程的虚构案例。[查看示例材料](showcase/export-review.md)。*
+[查看示例材料](showcase/export-review.md)。
 
 <details>
 <summary><strong>在本地生成示例页面</strong></summary>

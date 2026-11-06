@@ -52,72 +52,17 @@ Start with local changes, an open PR, or a revised commit. The agent determines 
 
 ## Workflow
 
-**Request a review → read trusted rules → identify the change → AI review ↔ authorized fixes → PR checks → human decision → merge handoff.**
+![HTML review brief for illustrative PR 42 at commit a1b2c3d, showing the AI finding, fix evidence, CI result, and pending human decision.](docs/media/export-review-preview.png)
 
-You can start with local changes or an existing PR. A local-only request ends with a review report. PR creation, updates, and merging require authorization for those actions.
+*Screenshot of the bundled HTML renderer. PR #42 and commit a1b2c3d are illustrative. [Read the example brief](docs/showcase/export-review.md).*
 
-The YAML below describes the agent's workflow. The agent follows [SKILL.md](SKILL.md) and the linked guides; this block is not an executable GitHub Actions configuration.
+1. **Review the change.** Read trusted repository rules and pin the review scope and version. AI checks the affected code and records findings.
+2. **Revise and verify.** With authorization, fix confirmed problems and re-review. Match required checks to the current commit. Local and PR reviews share a default total of three AI rounds.
+3. **Let a person decide.** After checks pass and blockers clear, present key code, findings, evidence, risks, and open decisions. A person approves, requests changes, or defers for that version.
 
-```yaml
-workflow:
-  trigger: "Ask your agent to review a change or PR"
-  default_mode: read_only
-  max_ai_review_rounds: 3  # One total across local review and the PR.
+Reviews are read-only by default. A local-only request can end with its report. PR writes and merging require corresponding authorization. CI and AI results do not replace human approval.
 
-  stages:
-    - id: read_rules
-      owner: agent
-      action: "Read trusted CLAUDE.md, REVIEW.md, and included rules"
-      if_root_rules_missing: "Draft missing rules; ask before writing; continue independent checks"
-      if_references_missing: "Report missing paths and affected checks"
-
-    - id: identify_change
-      owner: agent
-      action: "Choose local changes or a PR; pin the base and reviewed version"
-      local_scope: "Include in-scope committed, staged, unstaged, and untracked changes"
-      pr_scope: "Review the pinned PR head; list extra local changes separately"
-
-    - id: ai_review
-      owner: independent_reviewer_when_available
-      action: "Review the full diff, affected callers, failure paths, and available checks"
-      output: "Verified P0/P1/P2 findings, evidence, and unresolved counts"
-
-    - id: resolve_findings
-      owner: author_or_authorized_agent
-      with_fix_authorization: "Fix confirmed problems; rerun checks; return to ai_review"
-      without_fix_authorization: "Report findings and blockers; keep code unchanged"
-      on_repeated_failure: "If two fixes share a premise and fail the same check, test that premise"
-      after_round_three_with_blockers: "Stop automatic fixes; diagnose and propose options"
-      if_local_only: "Deliver the report and any authorized fixes; no PR is required"
-
-    - id: pr_checks
-      owner: agent_and_ci
-      when: "A PR exists, or PR delivery is requested and authorized"
-      action: "Create or update only as authorized; match CI and threads to base/head"
-      on_new_code: "Return to ai_review within the same three-round total"
-      on_failed_or_missing_checks: "Resolve within authorization or report the blocker"
-      ready_when: "Required checks pass, evidence is sufficient, and no blockers remain"
-
-    - id: human_review
-      owner: human
-      requires: "A PR and the ready_when conditions above"
-      input: "Exact commit, P0/P1/P2 summary, key code, evidence, risks, and decisions"
-      approve: "Record the decision for the reviewed version"
-      request_changes: "Return to authorized fixes and review within the remaining rounds"
-      defer: "Wait for the human decision; preserve the evidence"
-
-    - id: merge_handoff
-      owner: authorized_merger
-      requires: "Human approval, passing checks, repository rules, and merge authorization"
-      on_changed_version: "Repeat affected checks and review; reconfirm affected decisions"
-      result: "Merge when authorized, or hand off with remaining merge conditions"
-```
-
-The round limit applies to every return to AI review. Creating a PR, changing methods, or resuming a session does not reset it. If further review would exceed the limit, stop the automatic loop and present a concrete plan for a decision. CI retries do not consume another review round.
-
-CI and AI review can run in parallel for an existing PR. Its available CI evidence is inspected during review; the final PR check confirms that all required results apply to the version sent to the human. Missing independent-review capability is reported as a limitation.
-
-[Review scope and trusted rules](references/review-target.md) · [Missing-rule drafts](references/review-rules.md) · [Review and revision](references/pr-workflow.md) · [Human review and P0/P1/P2](references/human-review.md)
+[Review scope and rules](references/review-target.md) · [Review and revision](references/pr-workflow.md) · [Human review](references/human-review.md)
 
 The workflow draws on the Claude Code team's practices for early review, bounded review rounds, and explanations of key code. [How the Claude Code team does code review](https://claude.dev/blog/solving-code-review-at-anthropic/)
 
@@ -144,9 +89,7 @@ A user queues a CSV export, then loses access before the worker runs. The review
 
 With fixes authorized, the author adds a permission check at execution time and a regression test. Re-review confirms that revoked access prevents file creation and checks the CI result for that commit. A person then decides whether `Export unavailable` explains the outcome clearly enough.
 
-![Illustrative review brief for PR 42 at commit a1b2c3d. CI passed, AI blockers resolved, and a human decision is pending.](docs/media/export-review-preview.png)
-
-*Illustrative case, not a live PR. [Read the example brief](docs/showcase/export-review.md).*
+[Read the example brief](docs/showcase/export-review.md).
 
 <details>
 <summary><strong>Render this example locally</strong></summary>

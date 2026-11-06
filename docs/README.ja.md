@@ -52,72 +52,17 @@ code-review-lifecycle スキルを使って、変更をレビューしてくだ�
 
 ## レビューの流れ
 
-**レビュー依頼 → 信頼できるルール → 対象の特定 → AI レビュー ↔ 許可された修正 → PR の検証 → 人による判断 → マージの引き継ぎ。**
+![架空の PR 42、コミット a1b2c3d の HTML レビュー資料。AI の指摘、修正の証拠、CI 結果、人による未完了の判断を示す。](media/export-review-preview.png)
 
-ローカルの変更や既存の PR から始められます。ローカルレビューだけの依頼は、レポートの提出で完了します。PR の作成、更新、マージには、それぞれの操作に対する許可が必要です。
+*同梱の HTML レンダラーで生成したページのスクリーンショットです。PR #42 とコミット a1b2c3d は説明用の架空の例です。[レビュー資料を読む](showcase/export-review.md)。*
 
-以下の YAML はエージェントの手順を説明します。実際の指示は [SKILL.md](../SKILL.md) と参照資料にあります。このブロックは実行可能な GitHub Actions 設定ではありません。
+1. **変更をレビューする。** 信頼できるリポジトリルールを読み、対象範囲とバージョンを固定します。AI が影響するコードを確認し、指摘を記録します。
+2. **修正して検証する。** 許可を受けて問題を修正し、再レビューします。必須検証を現在のコミットに対応させます。AI レビューはローカルから PR まで、既定で合計最大 3 回です。
+3. **人が判断する。** 検証と阻害要因への対応が完了したら、重要なコード、指摘、証拠、リスク、判断事項を示します。人がそのバージョンを承認するか、修正を依頼するか、保留します。
 
-```yaml
-workflow:
-  trigger: "変更または PR のレビューをエージェントに依頼する"
-  default_mode: read_only
-  max_ai_review_rounds: 3  # ローカルから PR まで合計で最大 3 回。
+レビューは既定で読み取り専用です。ローカルレビューはレポートの提出で完了できます。PR の書き込みとマージには、それぞれの許可が必要です。CI と AI の結果は人による承認を代行しません。
 
-  stages:
-    - id: read_rules
-      owner: agent
-      action: "信頼できる CLAUDE.md、REVIEW.md と参照先のルールを読む"
-      if_root_rules_missing: "不足するルートルールの草案を示し、書き込み前に確認する。独立した確認は続ける"
-      if_references_missing: "不足する参照先と影響する検証を報告する"
-
-    - id: identify_change
-      owner: agent
-      action: "ローカルの変更か PR を選び、基準と対象バージョンを固定する"
-      local_scope: "対象範囲内のコミット済み、ステージ済み、未ステージ、未追跡の変更を含める"
-      pr_scope: "固定した PR head をレビューし、追加のローカル変更は別に示す"
-
-    - id: ai_review
-      owner: independent_reviewer_when_available
-      action: "差分全体、影響する呼び出し元、失敗経路、利用可能な検証を確認する"
-      output: "確認済みの P0/P1/P2 指摘、証拠、未解決件数"
-
-    - id: resolve_findings
-      owner: author_or_authorized_agent
-      with_fix_authorization: "確認済みの問題を修正し、検証後に ai_review へ戻る"
-      without_fix_authorization: "指摘と阻害要因を報告し、コードは変更しない"
-      on_repeated_failure: "同じ前提に基づく 2 回の修正が同じ検証に失敗したら、その前提を調べる"
-      after_round_three_with_blockers: "自動修正を止め、原因と対応案を示す"
-      if_local_only: "レポートと許可された修正を提出する。PR 作成は不要"
-
-    - id: pr_checks
-      owner: agent_and_ci
-      when: "PR があるか、PR の提出が依頼され許可されている"
-      action: "許可された範囲で PR を作成または更新し、CI とスレッドを base/head に対応させる"
-      on_new_code: "合計 3 回の上限を守って ai_review へ戻る"
-      on_failed_or_missing_checks: "許可の範囲で対処するか、阻害要因として報告する"
-      ready_when: "必須検証が成功し、証拠が十分で、阻害要因が残っていない"
-
-    - id: human_review
-      owner: human
-      requires: "PR があり、上記の ready_when 条件を満たしている"
-      input: "対象コミット、P0/P1/P2 概要、重要なコード、証拠、リスク、判断事項"
-      approve: "対象バージョンに対する人の承認を記録する"
-      request_changes: "残りの回数内で、許可された修正と再レビューに戻る"
-      defer: "人の判断を待ち、証拠を保持する"
-
-    - id: merge_handoff
-      owner: authorized_merger
-      requires: "人の承認、検証の成功、リポジトリルールの充足、マージの許可"
-      on_changed_version: "影響する検証とレビューを繰り返し、影響する人の判断を再確認する"
-      result: "許可されたマージを行うか、残る条件を示して引き継ぐ"
-```
-
-AI レビューへ戻るたびに元の回数を引き継ぎます。PR の作成、方法の変更、セッション再開で回数をリセットしません。上限を超える前に自動ループを止め、具体的な対応案を示します。CI の再試行はレビュー回数に加算しません。
-
-既存 PR の CI と AI レビューは並行できます。レビュー中に既存の CI 証拠を読み、最終確認で必須結果が人に渡すバージョンと一致することを確かめます。独立したレビューが使えない場合は、その制限を明示します。
-
-[対象範囲と信頼できるルール](../references/review-target.md) · [不足するルールの草案](../references/review-rules.md) · [レビューと修正](../references/pr-workflow.md) · [人によるレビューと P0/P1/P2](../references/human-review.md)
+[対象範囲とルール](../references/review-target.md) · [レビューと修正](../references/pr-workflow.md) · [人によるレビュー](../references/human-review.md)
 
 Claude Code チームの早期レビュー、レビュー回数の上限、重要なコードの解説を参考にしています。[Claude Code チームのコードレビュー](https://claude.dev/blog/solving-code-review-at-anthropic/)
 
@@ -144,9 +89,7 @@ Claude Code チームの早期レビュー、レビュー回数の上限、重�
 
 修正の許可を受けた作成者が実行時の権限確認と回帰テストを追加します。再レビューで権限取り消し後にファイルを生成しないことと、対象コミットの CI を確認します。`Export unavailable` という表示で結果を理解できるかは、人が判断します。
 
-![架空の PR 42、コミット a1b2c3d のレビュー例。CI 成功、AI の阻害要因は解決済み、人による判断は未完了。](media/export-review-preview.png)
-
-*手順を説明する架空の例です。[レビュー資料を読む](showcase/export-review.md)。*
+[レビュー資料を読む](showcase/export-review.md)。
 
 <details>
 <summary><strong>例のページをローカルで生成する</strong></summary>
