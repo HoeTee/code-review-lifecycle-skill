@@ -52,30 +52,17 @@ Start with local changes, an open PR, or a revised commit. The agent determines 
 
 ## Workflow
 
-| Before a PR | During PR review | Before merge |
-| --- | --- | --- |
-| Read the rules and identify the change. | Verify findings, fix with authorization, and re-review. | Give a person the evidence to decide. |
-| **Result:** review scope, findings, and local evidence. | **Result:** revision checks and CI matched to the reviewed commit. | **Result:** a review brief and an explicit human decision. |
+![Code Review Lifecycle workflow: trusted rules, pinned scope and version, bounded AI review and authorized repair, a local-report exit, PR and CI evidence, human decisions, and authorized merge handoff.](docs/media/review-workflow.png)
 
-You can enter at any stage. Reviews are read-only by default. Fixes, pushes, comments, and other platform writes need authorization for the corresponding action.
+*The Skill’s workflow, generated as a dedicated HTML guide with Answer me with HTML. [View full-size diagram](docs/media/review-workflow.svg) · [HTML guide to open locally](docs/showcase/review-workflow.html) · [Guide source](docs/showcase/review-workflow.md).*
 
-### 1. Before a PR: understand the change
+1. **Review the change.** Read trusted repository rules and pin the review scope and version. AI checks the affected code and records findings.
+2. **Revise and verify.** With authorization, fix confirmed problems and re-review. Match required checks to the current commit. Local and PR reviews share a default total of three AI rounds.
+3. **Let a person decide.** After checks pass and blockers clear, present key code, findings, evidence, risks, and open decisions. A person approves, requests changes, or defers for that version.
 
-Read the applicable `CLAUDE.md` and `REVIEW.md` before analyzing the diff. Load rules and their included files from the same trusted baseline. Changes to the rules are themselves part of the review.
+Reviews are read-only by default. A local-only request can end with its report. PR writes and merging require corresponding authorization. CI and AI results do not replace human approval.
 
-Identify staged, unstaged, committed, and relevant untracked changes. Follow affected callers, consumers, shared state, and failure paths. Run applicable checks or inspect existing evidence. Use an independent review context when the host provides one. [Review scope and rules](references/review-target.md)
-
-### 2. During PR review: check each revision
-
-Pin the PR base and head, then inspect CI, logs, findings, and discussion threads. Check that the evidence applies to the current version.
-
-With fixes authorized, verify each finding, fix confirmed problems in scope, and repeat the affected checks. Re-review the revised code and its effects. The AI review cycle ends when blockers clear, with up to three completed rounds by default. If blockers remain after round three, automatic fixes stop and the agent explains the remaining problem and proposes a next step. [Review and revision](references/pr-workflow.md)
-
-### 3. Before merge: put the decision in human hands
-
-After required checks pass and blockers are addressed, prepare a brief with the behavior before and after the change, key code, actual evidence, unverified areas, and decisions still open. Keep the full diff and source available.
-
-A person approves, requests changes, or defers. Record that decision against the PR and reviewed commit. New changes that affect the decision require the relevant checks and review again. Repository approval rules still apply. [Human review](references/human-review.md)
+[Review scope and rules](references/review-target.md) · [Review and revision](references/pr-workflow.md) · [Human review](references/human-review.md)
 
 The workflow draws on the Claude Code team's practices for early review, bounded review rounds, and explanations of key code. [How the Claude Code team does code review](https://claude.dev/blog/solving-code-review-at-anthropic/)
 
@@ -102,9 +89,9 @@ A user queues a CSV export, then loses access before the worker runs. The review
 
 With fixes authorized, the author adds a permission check at execution time and a regression test. Re-review confirms that revoked access prevents file creation and checks the CI result for that commit. A person then decides whether `Export unavailable` explains the outcome clearly enough.
 
-![Illustrative review brief for PR 42 at commit a1b2c3d. CI passed, AI blockers resolved, and a human decision is pending.](docs/media/export-review-preview.png)
+![Illustrative HTML review brief for PR 42 at commit a1b2c3d, showing a resolved AI finding and a pending human decision.](docs/media/export-review-preview.png)
 
-*Illustrative case, not a live PR. [Read the example brief](docs/showcase/export-review.md).*
+*Illustrative case. [Read the example brief](docs/showcase/export-review.md).*
 
 <details>
 <summary><strong>Render this example locally</strong></summary>

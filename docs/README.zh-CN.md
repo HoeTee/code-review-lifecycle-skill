@@ -52,30 +52,17 @@ npx skills add HoeTee/code-review-lifecycle-skill --agent codex claude-code open
 
 ## 审查流程
 
-| PR 前 | PR 审查中 | 合并前 |
-| --- | --- | --- |
-| 读取规则，识别改动。 | 核实发现，获准返修，再复审。 | 给人足够的依据作决定。 |
-| **结果：**审查范围、发现与本地证据。 | **结果：**返修检查及对应当前版本的 CI。 | **结果：**审核材料与明确的人工结论。 |
+![整个 Skill 的工作流：可信规则、固定范围与版本、AI 审查与授权返修、本地报告出口、PR 与 CI、人工决定及按授权合并交接。](media/review-workflow.png)
 
-可以从任一阶段进入。默认只读审查。修复、推送、评论等写入操作，需要有对应授权。
+*使用 Answer me with HTML 单独生成的工作流介绍图。[查看完整尺寸](media/review-workflow.svg) · [下载并本地打开 HTML 介绍页](showcase/review-workflow.html) · [内容源稿](showcase/review-workflow.md)。*
 
-### 1. PR 前：理解改动
+1. **审查改动。** 读取可信仓库规则，固定审查范围与版本。AI 检查受影响代码并记录发现。
+2. **返修与验证。** 获准后修复确认的问题，再复审。必需检查对应当前提交。本地和 PR 审查默认合计最多三轮 AI 审查。
+3. **交给人决定。** 检查通过、阻断清除后，展示关键代码、发现、证据、风险和待判断项。人针对该版本选择通过、要求修改或暂缓。
 
-分析 diff 前先读取适用的 `CLAUDE.md` 和 `REVIEW.md`。规则及其引用文件从同一可信基线加载。候选版本对规则的修改也属于受审内容。
+默认只读。本地审查可以在交付报告后结束。PR 写入和合并需要对应授权。CI 和 AI 结果不能代替人工批准。
 
-识别暂存、未暂存、已提交及相关未跟踪改动。沿调用方、消费方、共享状态和失败路径核对影响。运行适用检查或核对已有证据。宿主支持时，使用与作者分开的上下文独立审查。[审查范围与规则](../references/review-target.md)
-
-### 2. PR 审查中：核对每次返修
-
-固定 PR 的 base 和 head，读取 CI、日志、发现与讨论线程。核对证据是否适用于当前版本。
-
-获准返修后，核实每项发现，修复范围内确认的问题，复跑受影响检查。复审同时核对修改后的代码及其影响。AI 审查默认最多完成三轮，阻断项清除就结束。第三轮仍有阻断时，停止自动返修，说明剩余问题并提出下一步。[审查与返修](../references/pr-workflow.md)
-
-### 3. 合并前：让人清楚地作决定
-
-必需检查通过、阻断项处理完成后，整理修改前后行为、关键代码、实际证据、未验证范围及待判断项。保留完整 diff 与源码入口。
-
-人明确选择通过、要求修改或暂缓。结论绑定对应 PR 和受审提交。新改动影响原结论时，重新检查和审核相关部分。平台审批仍遵守仓库规则。[人工审核](../references/human-review.md)
+[审查范围与规则](../references/review-target.md) · [审查与返修](../references/pr-workflow.md) · [人工审核](../references/human-review.md)
 
 流程参考 Claude Code 团队的早期审查、有限轮次和关键代码解释做法。[Claude Code 团队的代码审查实践](https://claude.dev/blog/solving-code-review-at-anthropic/)
 
@@ -102,9 +89,9 @@ npx skills add HoeTee/code-review-lifecycle-skill --agent codex claude-code open
 
 获准返修后，作者补上执行时的权限检查和回归测试。复审确认权限撤回后不会生成文件，并核对对应提交的 CI。人再判断 `Export unavailable` 是否解释清楚了结果。
 
-![虚构 PR 42、提交 a1b2c3d 的审核示例：CI 通过、AI 阻断项已处理，人工决定待完成。](media/export-review-preview.png)
+![虚构 PR 42、提交 a1b2c3d 的 HTML 审核报告示例，展示已处理的 AI 发现和待完成的人工决定。](media/export-review-preview.png)
 
-*这是说明流程的虚构案例。[查看示例材料](showcase/export-review.md)。*
+*这是虚构案例。[查看示例材料](showcase/export-review.md)。*
 
 <details>
 <summary><strong>在本地生成示例页面</strong></summary>
