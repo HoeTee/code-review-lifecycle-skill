@@ -22,7 +22,7 @@ A shared Agent Skill for **Codex**, **Claude Code**, and **OpenCode**.
   <img src="docs/media/review-lifecycle-hero.webp" width="860" alt="A code diff, verification evidence, and a human review decision connected through the review lifecycle.">
 </p>
 
-Ask your coding agent to review a change. It reads the repository's rules, identifies the local changes or PR, and checks the affected code and behavior. When fixes are authorized, it follows findings through verification and re-review.
+Ask your coding agent to review a change. It reads the repository's rules, identifies the local changes or PR, and checks the affected code and behavior. The AI stage fixes confirmed defects within that scope, verifies the changes, and re-reviews them before the final human check.
 
 The human reviewer gets key code, actual check results, remaining risks, and a clear decision to make. Review evidence stays tied to the PR and commit it describes.
 
@@ -52,15 +52,15 @@ Start with local changes, an open PR, or a revised commit. The agent determines 
 
 ## Workflow
 
-![Code Review Lifecycle workflow: trusted rules, pinned scope and version, bounded AI review and authorized repair, a local-report exit, PR and CI evidence, human decisions, and authorized merge handoff.](docs/media/review-workflow.png)
+![Code Review Lifecycle workflow: trusted rules and pinned scope, an AI review, repair, verification and re-review loop, current PR and CI evidence, then the final human check and merge handoff.](docs/media/review-workflow.png)
 
 *The Skill’s workflow, generated as a dedicated HTML guide with Answer me with HTML. [View full-size diagram](docs/media/review-workflow.svg) · [HTML guide to open locally](docs/showcase/review-workflow.html) · [Guide source](docs/showcase/review-workflow.md).*
 
-1. **Review the change.** Read trusted repository rules and pin the review scope and version. AI checks the affected code and records findings.
-2. **Revise and verify.** With authorization, fix confirmed problems and re-review. Match required checks to the current commit. Local and PR reviews share a default total of three AI rounds.
-3. **Let a person decide.** After checks pass and blockers clear, present key code, findings, evidence, risks, and open decisions. A person approves, requests changes, or defers for that version.
+1. **Set the review scope.** Read trusted repository rules and pin the scope and version.
+2. **Let AI review and fix.** AI reviews the code, fixes confirmed defects within scope, verifies the changes, and re-reviews them. Local and PR reviews share a default total of three AI rounds. Routine fixes do not wait for individual human approval.
+3. **Finish with a human check.** After required checks pass and blockers clear, present key code, findings, evidence, risks, and open decisions. A person approves, requests changes, or defers for that version.
 
-Reviews are read-only by default. A local-only request can end with its report. PR writes and merging require corresponding authorization. CI and AI results do not replace human approval.
+Ask for a read-only review to receive findings without edits. A local-only request can end with local fixes and a report. Commits, pushes, PR writes, and merging require corresponding authorization. CI and AI results do not replace the final human approval.
 
 [Review scope and rules](references/review-target.md) · [Review and revision](references/pr-workflow.md) · [Human review](references/human-review.md)
 
@@ -87,7 +87,7 @@ Product UI verification can include screenshots when required. Generated explana
 
 A user queues a CSV export, then loses access before the worker runs. The reviewer follows the request into the worker and finds that the worker can still generate the file.
 
-With fixes authorized, the author adds a permission check at execution time and a regression test. Re-review confirms that revoked access prevents file creation and checks the CI result for that commit. A person then decides whether `Export unavailable` explains the outcome clearly enough.
+The agent adds a permission check at execution time and a regression test. Re-review confirms that revoked access prevents file creation and checks the CI result for that commit. In the final check, a person decides whether `Export unavailable` explains the outcome clearly enough.
 
 ![Illustrative HTML review brief for PR 42 at commit a1b2c3d, showing a resolved AI finding and a pending human decision.](docs/media/export-review-preview.png)
 
@@ -123,7 +123,7 @@ Use your coding agent's available tools and review capabilities. Independent rev
 <details>
 <summary><strong>Will the agent change code or push to GitHub?</strong></summary>
 
-A review is read-only by default. You can authorize fixes, PR updates, or other writes. Each action stays within that authorization and the repository's permissions.
+The default lifecycle includes local fixes for confirmed defects within the review scope, followed by verification and re-review. Ask for a read-only review to prevent edits. Commits, pushes, PR updates, and merging need corresponding authorization and repository permissions.
 
 </details>
 

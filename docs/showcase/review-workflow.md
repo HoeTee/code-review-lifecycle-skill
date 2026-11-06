@@ -1,36 +1,39 @@
 ---
 title: How Code Review Lifecycle works
-subtitle: Review a change, verify the evidence, and give a person the merge decision
+subtitle: AI reviews, fixes, and verifies the change. A person makes the final check.
 lang: en
 template: doc
 theme: blueprint
 mode: light
-source: v0.1.0 workflow instructions
+source: Current workflow instructions in this repository
 ---
 
-Start with local changes or an existing PR. The agent reads trusted rules, reviews a fixed version, and verifies the affected behavior.
-Repairs require authorization. A person decides after required checks pass and blockers clear.
+Start with local changes or an existing PR. The agent reads trusted rules and pins the review scope and version.
+The AI stage reviews, fixes confirmed defects, verifies, and re-reviews within that scope. A person checks the final result after required checks pass and blockers clear.
 
-## A The complete workflow
+## A The default workflow
 
 ```flow TB
 (Local change or existing PR) -> Trusted project rules
 Trusted project rules -> Pin scope and version
-Pin scope and version -> AI review (max 3 total)
-AI review (max 3 total) -> Authorized repair: confirmed issue + permission
-Authorized repair --> AI review (max 3 total): verify + re-review
-AI review (max 3 total) -> (Local report): local-only scope
-AI review (max 3 total) -> Current PR and CI: PR in scope
-Current PR and CI -> *Human decision: checks pass + no blockers
-Human decision --> Authorized repair: request changes
-Human decision -> (Defer): defer
-Human decision -> Merge gates: approve
+Pin scope and version -> AI review
+AI review -> AI repair: confirmed defect, rounds remain
+AI review -> AI verification: no fix needed
+AI repair -> AI verification
+AI verification --> AI review: revised code, max 3 reviews
+AI verification -> (Local result and report): local-only, review clear
+AI verification -> Current PR and CI: PR in scope, review clear
+Current PR and CI -> *Final human check: checks pass + no blockers
+Final human check -> (Defer): defer
+Final human check -> Merge gates: approve
 Merge gates -> (Handoff or authorized merge): rules + authority
+group AI stage: AI review, AI repair, AI verification
 ```
 
 The first review and re-reviews share a default total of **three completed AI reviews**.
 Local review, PR review, and human-requested revisions use the same count.
 If round three still has blockers, stop automatic repair and present the cause and options.
+CI defects and human-requested revisions return to the AI stage within the remaining review budget.
 
 ## B What moves between stages
 
@@ -38,15 +41,16 @@ If round three still has blockers, stop automatic repair and present the cause a
 |---|---|---|
 | Trusted rules | Host agent | Applicable CLAUDE.md, REVIEW.md, included rules, and their trusted source |
 | Scope and version | Host agent | Comparison base, reviewed commit or local snapshot, and file scope |
-| AI review (max 3 total) | Independent reviewer when available, plus verification tools | Confirmed P0/P1/P2 findings, check results, evidence, and limits |
-| Authorized repair | Author or authorized agent | The smallest complete fix, a new version, and repeated checks |
+| AI review | Independent reviewer when available | Confirmed P0/P1/P2 findings for a fixed version, evidence, and limits |
+| AI repair and verification | Main agent | The smallest complete fix within scope, a new version, and repeated checks |
 | Current PR and CI | Agent and platform | Current PR/head, required checks, thread state, and matching evidence |
-| Human decision | Human reviewer | Approve, request changes, or defer for the exact reviewed version |
+| Final human check | Human reviewer | Check the final behavior, code, evidence, and risks; approve, request changes, or defer |
 | Merge gates | Eligible, authorized operator | Platform requirements and merge authority, then handoff or verified merge state |
 
 Missing root rules receive complete drafts for confirmation before writing.
 Independent checks supported by known rules continue while drafts await confirmation.
 Relevant untracked files belong to a local candidate; extra local changes stay separate from a pinned PR head.
+Before repair, match the working tree to the reviewed version. Use an isolated working tree for a PR head when the current checkout differs, and preserve unrelated user changes.
 
 ## C The AI review loop
 
@@ -54,21 +58,28 @@ Use a review context separate from the author when the host supports it.
 Read the full diff and follow affected callers, shared state, and failure paths.
 Record unresolved P0/P1/P2 counts, triggers, impact, evidence, and processing status.
 
-Fix confirmed defects only within existing authorization.
-Repeat affected checks and review the revised code.
+The default lifecycle includes local fixes for confirmed defects within scope.
+The main agent fixes and verifies; the independent reviewer reads a fixed version without editing it.
+Routine fixes do not wait for individual or per-round human approval.
+Repeat affected checks and review the revised code before the final human check.
 Creating a PR, switching methods, or restoring a session does not reset the review count.
+
+Explicit read-only requests receive findings without edits.
+Commits, pushes, PR writes, and merging retain their separate authorization requirements.
+Unclear requirements or changes beyond scope need a concrete decision; they do not authorize a broader repair.
 
 Two failed fixes that share a premise and fail the same check trigger a direct test of that premise.
 Required checks and missing evidence remain visible.
 A further review beyond the limit needs a concrete plan and explicit authorization.
 
-## D The human decision
+## D The final human check
 
-Prepare the final human review package when required checks pass and no blockers remain.
+Prepare the final human review package after AI repair and re-review, when required checks pass and no blockers remain.
 Include key code, the full diff, findings, actual evidence, risks, and the precise decision needed.
+The person checks the final result and remaining risks. Routine technical fixes are handled in the AI stage.
 
 - **Approve:** record the decision for this PR and commit, then check merge conditions.
-- **Request changes:** return to authorized repair and review within the remaining budget.
+- **Request changes:** return to AI repair, verification, and re-review within the remaining budget.
 - **Defer:** preserve open decisions and evidence.
 
 CI and AI review can run in parallel for an existing PR.
@@ -83,5 +94,5 @@ The Skill guides the agent; this page does not execute the workflow.
 
 ## E Workflow sources
 
-[Skill entry](https://github.com/HoeTee/code-review-lifecycle-skill/blob/v0.1.0/SKILL.md) · [Trusted rules and scope](https://github.com/HoeTee/code-review-lifecycle-skill/blob/v0.1.0/references/review-target.md) · [Missing-rule drafts](https://github.com/HoeTee/code-review-lifecycle-skill/blob/v0.1.0/references/review-rules.md) · [Review and revision](https://github.com/HoeTee/code-review-lifecycle-skill/blob/v0.1.0/references/pr-workflow.md) · [Verification](https://github.com/HoeTee/code-review-lifecycle-skill/blob/v0.1.0/references/verification.md) · [Human review](https://github.com/HoeTee/code-review-lifecycle-skill/blob/v0.1.0/references/human-review.md)
+[Skill entry](../../SKILL.md) · [Trusted rules and scope](../../references/review-target.md) · [Missing-rule drafts](../../references/review-rules.md) · [Review and revision](../../references/pr-workflow.md) · [Verification](../../references/verification.md) · [Human review](../../references/human-review.md)
 
