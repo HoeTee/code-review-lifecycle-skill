@@ -26,5 +26,5 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           package-manager-cache: false
-      - name: Run regression and renderer integrity tests
+      - name: Run CLI, regression and renderer integrity tests
         run: python -B -m unittest discover -s scripts -v

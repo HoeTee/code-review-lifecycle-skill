@@ -81,6 +81,19 @@ The workflow draws on the Claude Code team's practices for early review, bounded
 
 Product UI verification can include screenshots when required. Generated explanation and review pages are checked for content and links without a screenshot pass.
 
+## Tool CLI and token records
+
+The agent uses a shared Node.js CLI for Git evidence, explicit validation commands, incremental records, status, and HTML reports. The CLI does not call a model or decide whether a finding is correct.
+
+| Command | Purpose |
+|---|---|
+| `prepare` | Pin the candidate and collect diff, new-file, and trusted-rule evidence. |
+| `verify` | Run an explicit check plan and preserve its actual results. |
+| `record` / `status` | Track findings, review rounds, required checks, and current-version evidence. |
+| `report` / `stats` | Render recorded results and show token records. |
+
+Host-reported input, output, and cache tokens can be imported and deduplicated by request ID. Missing actual usage stays unknown. CLI stdout estimates are shown separately and do not measure model reasoning or token savings. [CLI and usage formats](references/cli.md)
+
 ## Example review
 
 ### Access is revoked while an export is waiting

@@ -81,6 +81,19 @@ npx skills add HoeTee/code-review-lifecycle-skill --agent codex claude-code open
 
 产品界面可按要求截图验证。生成的说明页和审查报告核对内容与链接，不做截图验收。
 
+## 工具 CLI 与 token 记录
+
+Agent 使用共用 Node.js CLI 收集 Git 证据、执行明确检查、增量记录状态并生成报告。CLI 不调用模型，也不判断缺陷是否成立。
+
+| 命令 | 作用 |
+|---|---|
+| `prepare` | 固定候选，保存差异、新文件和可信规则证据。 |
+| `verify` | 执行明确检查计划，保存实际结果。 |
+| `record` / `status` | 记录发现、轮次、必需检查及版本对应关系。 |
+| `report` / `stats` | 渲染已有记录，查看 token 用量。 |
+
+可导入宿主实际提供的输入、输出和缓存 token，按请求 ID 去重。没有实际用量时显示未知。CLI stdout 粗略估算单列，不代表模型推理量或已测节省率。[CLI 与用量格式](../references/cli.md)
+
 ## 示例
 
 ### 导出任务等待执行时，用户权限被撤回
