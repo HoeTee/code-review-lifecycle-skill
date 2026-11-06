@@ -57,7 +57,7 @@ No human approval is recorded. Findings and failed checks remain visible.
   record: `record --file REVIEW_INPUT (or an explicit check/human/rules record)
 Review: retain prepare's id/candidate_id; fill summary, independent and findings.
 Finding: priority, title, location, trigger, impact, evidence. ID/open/blocking defaults are automatic.
-key_code may use path/start_line/end_line/explanation; source is captured by this command.
+key_code: path, range:[start,end], explanation; "start-end" and start_line/end_line are also accepted (1..200 lines).
 Records only: no checks are executed and no report is rendered.
 `,
   render: `render --output HTML
@@ -296,6 +296,8 @@ function prepare(state, statePath) {
       review_fields: ['summary', 'independent', 'findings'],
       finding_fields: ['priority', 'title', 'location', 'trigger', 'impact', 'evidence'],
       finding_defaults: { id: 'finding-1, finding-2, ...', status: 'open', blocking: 'true for P0/P1; false for P2 unless specified' },
+      key_code: { example: { path: 'relative/source.ext', range: [1, 10], explanation: 'Explain this code.' },
+        range_string: '1-10', alternative_fields: ['path', 'start_line', 'end_line', 'explanation'], max_lines: 200 },
       delivery: ['record --file REVIEW_INPUT', 'render --output HTML', 'validate --output HTML'],
       note: 'Reuse the current node/CLI/--state prefix. Batch known sequential actions in one host call; do not reread CLI docs or state for normal use.' } } };
 }
@@ -638,6 +640,16 @@ function materializeReview(state, input) {
   }));
   for (const item of data.key_code ?? []) {
     if (item.code != null) continue;
+    if (Object.hasOwn(item, 'range')) {
+      const range = typeof item.range === 'string' && /^\d+\s*-\s*\d+$/.test(item.range)
+        ? item.range.split('-').map(Number) : item.range;
+      assert(Array.isArray(range) && range.length === 2, 'key_code.range must be [start,end] or "start-end"');
+      for (const [index, key] of ['start_line', 'end_line'].entries()) {
+        assert(!Object.hasOwn(item, key) || item[key] === range[index], `Conflicting key_code.${key} and range`);
+        item[key] = range[index];
+      }
+      delete item.range;
+    }
     text(item.path, 'key_code.path');
     const filename = path.resolve(state.target.repo, item.path);
     const relative = path.relative(state.target.repo, filename).split(path.sep).join('/');
@@ -645,8 +657,10 @@ function materializeReview(state, input) {
       && isWithin(state.target.repo, fs.realpathSync(filename)), 'Code excerpt must be a regular repository file');
     assert(git(state.target.repo, ['--literal-pathspecs', 'ls-files', '--error-unmatch', '--', relative], true) !== null
       || state.candidate.untracked.some(entry => entry.path === relative && entry.kind === 'file'), 'Code excerpt must belong to the candidate');
-    assert(Number.isSafeInteger(item.start_line) && Number.isSafeInteger(item.end_line)
-      && item.start_line > 0 && item.end_line >= item.start_line && item.end_line-item.start_line < 200, 'Code range must contain 1..200 lines');
+    assert(Number.isSafeInteger(item.start_line) && Number.isSafeInteger(item.end_line),
+      'key_code needs integer start_line/end_line or range:[start,end]; see prepare.next.key_code');
+    assert(item.start_line > 0 && item.end_line >= item.start_line && item.end_line-item.start_line < 200,
+      'Code range must contain 1..200 lines');
     const source = fs.readFileSync(filename, 'utf8').split(/\r?\n/);
     assert(item.end_line <= source.length, 'Code range exceeds file');
     item.code = source.slice(item.start_line-1, item.end_line).join('\n');

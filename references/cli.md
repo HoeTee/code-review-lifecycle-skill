@@ -78,7 +78,7 @@ node /ABSOLUTE/SKILL/scripts/crl.mjs verify --state /ABSOLUTE/task.json --env PY
 
 record --file 接收 prepare 的 review_input。Agent 填写 summary、independent、findings 及必要 key_code，不重复抄写版本、命令、测试计数或完整状态。每条发现填写 priority、title、location、trigger、impact、evidence；未给 ID 时按本轮顺序补入，status 默认 open，blocking 对 P0/P1 默认 true、P2 默认 false。项目契约要求阻断的 P2 需显式设置 true，不能用默认值放宽要求。P0/P1 的 open 发现不能显式改成不阻断，accepted_risk 仍需真实决定证据。
 
-`key_code` 可用 `{path,start_line,end_line,explanation}`，工具从同一候选提取 1 到 200 行原文；也兼容明确的 location/code/explanation。原文一律作为不可执行的文本展示。
+`key_code` 可用 `{path,range:[起行,止行],explanation}` 或 `{path,start_line,end_line,explanation}`，range 也接受明确的十进制字符串 `"起行-止行"`。工具统一格式，再从候选提取 1 到 200 行原文；也兼容 location/code/explanation。提取时 range 与起止字段同时提供必须一致，不能猜冲突值。prepare.next 给出示例、字段及上限，不要求 Agent 额外查询格式。原文作为不可执行文本展示。
 
 平台观察或未运行项使用独立的 record check 格式，保持导入来源，不冒充 CLI 执行。
 

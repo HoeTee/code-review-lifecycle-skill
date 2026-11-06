@@ -13,7 +13,7 @@ Codex、Claude Code 和 OpenCode 共用此入口。用户只需说「做下 code
 
 先读取 prepare 返回的 `next` 与 `review_input`，正常使用不读 CLI 源码、整份状态或格式参考。单个已有检查直接用 `verify --state TASK [--env KEY=VALUE] [--timeout-ms N] [--result JSON] -- EXE ARGS`，工具保存计划，后续 verify 复用。`--result` 读取明确指定的根 run/failures/errors/skipped 字段；多检查或自定义结果结构才读 [CLI](references/cli.md) 并用 --plan。工具不猜测试命令，没有可靠计数时保留未知。
 
-模板只填简短结论、实际独立性、发现和必要解释。每条发现只需 priority、title、location、trigger、impact、evidence；ID、open 状态及 P0/P1 阻断默认由工具补入，其他状态和项目要求的 P2 阻断须明确提供。代码片段可给路径和行号，record 自动提取。版本、命令、计数和链接不在 summary 重抄。
+模板只填简短结论、实际独立性、发现和必要解释。每条发现只需 priority、title、location、trigger、impact、evidence；ID、open 状态及 P0/P1 阻断默认由工具补入，其他状态和项目要求的 P2 阻断须明确提供。代码片段用 `{path, range:[起行,止行], explanation}`，每项最多 200 行，也接受 start_line/end_line；record 自动提取并统一格式，相同内容重试不多计轮。版本、命令、计数和链接不在 summary 重抄。
 
 审查完成后分别调用 `record --file REVIEW_INPUT`、`render --output HTML`、`validate --output HTML`。这三个固定动作在一次宿主工具调用里依次执行，检查退出码，失败即停；不要每个动作都额外发起一轮模型响应。validate 只检查，不重新渲染或运行测试。正常流程不另写整理和页面检查脚本。status、stats 按当前调查或用量需求调用；finish/report 仅兼容已有调用，不再作为默认入口。
 

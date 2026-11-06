@@ -633,6 +633,43 @@ class ReviewCLITests(unittest.TestCase):
                 self.assertEqual(state['schema_version'], 1)
                 self.assertFalse(output.exists())
 
+    def test_range_alias_and_canonical_input_are_the_same_review(self):
+        prepared = self.prepare()
+        guide = prepared['next']['key_code']
+        self.assertEqual(guide['example']['range'], [1, 10])
+        self.assertEqual(guide['max_lines'], 200)
+        review = self.review()
+        review['key_code'] = [{'path':'feature.py','range':[1,1],'explanation':'The current value.'}]
+        self.record(review)
+        item = review['key_code'][0]
+        item['start_line'],item['end_line'] = item.pop('range')
+        self.assertTrue(self.record(review)['duplicate'])
+        state = json.loads(self.state.read_text(encoding='utf-8'))
+        self.assertEqual(len(state['reviews']), 1)
+        self.assertEqual(state['reviews'][0]['data']['key_code'][0]['code'], 'VALUE = 1')
+
+    def test_range_alias_cannot_hide_conflicts_or_invalid_bounds(self):
+        self.prepare()
+        for fields in [{'range':[1]}, {'range':[1,'1']}, {'range':[0,1]}, {'range':[1,201]},
+                       {'range':'1-1; echo x'}, {'range':'1-2-3'},
+                       {'range':[1,1],'start_line':2}, {'start':1,'end':1}]:
+            with self.subTest(fields=fields):
+                review = self.review()
+                review['key_code'] = [{'path':'feature.py','explanation':'The value.',**fields}]
+                result = self.record(review, expected=2)
+                if fields == {'start':1,'end':1}:
+                    self.assertIn('see prepare.next.key_code', result['error'])
+        self.assertEqual(self.call('status')['completed_reviews'], 0)
+
+    def test_observed_range_string_and_array_are_the_same_review(self):
+        self.prepare()
+        review = self.review()
+        review['key_code'] = [{'path':'feature.py','range':'1-1','explanation':'The value.'}]
+        self.record(review)
+        review['key_code'][0]['range'] = [1,1]
+        self.assertTrue(self.record(review)['duplicate'])
+        self.assertEqual(self.call('status')['completed_reviews'], 1)
+
 
 if __name__ == '__main__':
     unittest.main()
