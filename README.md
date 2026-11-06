@@ -87,10 +87,11 @@ The agent uses a shared Node.js CLI for Git evidence, explicit validation comman
 
 | Command | Purpose |
 |---|---|
-| `prepare` | Pin the candidate and collect diff, new-file, and trusted-rule evidence. |
-| `verify` | Run an explicit check plan and preserve its actual results. |
-| `record` / `status` | Track findings, review rounds, required checks, and current-version evidence. |
-| `report` / `stats` | Render recorded results and show token records. |
+| `prepare` | Pin the candidate and trusted rules, collect the diff, and create an editable review input. |
+| `verify` | Run an explicit check plan and capture declared JSON test results and logs. |
+| `finish` | Submit the completed review, check its version and status, and build and validate the HTML report in one call. |
+
+The agent supplies findings and explanations. The CLI fills recorded versions, commands, test counts, and evidence links. Advanced `record`, `status`, `report`, and `stats` commands remain available for imports, diagnosis, rerendering, and usage records.
 
 Host-reported input, output, and cache tokens can be imported and deduplicated by request ID. Missing actual usage stays unknown. CLI stdout estimates are shown separately and do not measure model reasoning or token savings. [CLI and usage formats](references/cli.md)
 

@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readHostUsage } from './crl_usage.mjs';
+import { resultSpecs, fileIdentity, readResult, checkReport } from './crl_artifacts.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const HELP = `Code Review Lifecycle tools (Node.js 20+; no model calls)
@@ -14,6 +15,8 @@ Usage: node scripts/crl.mjs <command> --state /absolute/task.json [options]
   prepare  --repo PATH [--base REF] [--rules-ref REF] [--pr-file JSON]
            [--read-only] [--refresh]
   verify   --plan JSON                 run explicit argv-based checks
+  finish   [--file REVIEW] --output HTML
+                                       record review, check state, render and check report
   record   --file JSON                 record review, imported check, or human decision
            --usage-file JSON           import normalized host-reported token usage
            --usage-format codex-jsonl --turn-id ID --usage-file JSONL
@@ -25,6 +28,27 @@ Options: --pretty, --json (JSON is the default), --help
 Put state and output outside the work tree or in a Git-ignored directory.
 Review/usage formats and limits: references/cli.md
 `;
+const COMMAND_HELP = {
+  prepare: `prepare --repo PATH --base REF [--read-only] [--refresh]
+Returns pinned diff/rule paths and review_input, an editable JSON template.
+Read the full applicable rules and diff. Fill semantic conclusions in the template.
+`,
+  verify: `verify --plan JSON (later calls reuse the saved plan)
+{"checks":[{"name":"unit","argv":["python","-m","unittest"],"env":{"PYTHONDONTWRITEBYTECODE":"1"},"results":[{"path":"results.json","fields":{"run":"/run","failures":"/failures","errors":"/errors","skipped":"/skipped"}}]}]}
+env and results are optional. Result paths are relative to check cwd; fields are explicit JSON pointers.
+Missing, unchanged, invalid or failing required results fail the check; unknown counts stay unknown.
+`,
+  finish: `finish [--file REVIEW] --output HTML
+Uses prepare's review_input by default. Fill summary, independent, findings and optional key_code/checks.
+Facts (versions, commands, test counts, totals, links) come from state; do not repeat them in summary.
+Finding: id, priority P0/P1/P2, title, location, trigger, impact, evidence, status, blocking.
+key_code: {path,start_line,end_line,explanation}, or {location,code,explanation,language}.
+Optional checks: name, source, evidence, observed_at, required, status (imported observations).
+One call records the round/checks, checks the candidate, renders and validates HTML, and returns a short status.
+Render failures keep the completed review. Retry the same input without prepare; it does not add a round.
+No human approval is recorded. Findings and failed checks remain visible.
+`,
+};
 const optionTypes = {
   state: 'string', repo: 'string', base: 'string', 'rules-ref': 'string',
   'pr-file': 'string', plan: 'string', file: 'string', 'usage-file': 'string',
@@ -43,6 +67,7 @@ const now = () => new Date().toISOString();
 const text = (value, name) => { assert(typeof value === 'string' && value.trim(), `${name} must be nonempty text`); return value; };
 const readJSON = filename => JSON.parse(fs.readFileSync(filename, 'utf8').replace(/^\uFEFF/, ''));
 const isWithin = (root, filename) => { const rel = path.relative(root, filename); return rel === '' || (!rel.startsWith(`..${path.sep}`) && rel !== '..' && !path.isAbsolute(rel)); };
+const pathKey = filename => process.platform === 'win32' ? path.resolve(filename).toLowerCase() : path.resolve(filename);
 
 function git(repo, args, optional = false) {
   const result = spawnSync('git', ['-C', repo, ...args], { maxBuffer: 128 * 1024 * 1024 });
@@ -106,12 +131,13 @@ function snapshot(repo, base, rulesIdentity = base) {
 }
 function collectRules(repo, sha, files, directory, approved = {}) {
   const pending = new Set(['CLAUDE.md', 'REVIEW.md']), records = [], gaps = [];
+  const trustedPaths = new Set(git(repo, ['ls-tree', '-r', '--name-only', '-z', sha]).toString('utf8').split('\0'));
   for (const filename of files) {
     let dir = path.posix.dirname(filename);
     while (dir !== '.') {
       for (const name of ['CLAUDE.md', 'REVIEW.md']) {
         const rule = `${dir}/${name}`;
-        if (own(approved, rule) || git(repo, ['cat-file', '-e', `${sha}:${rule}`], true) !== null) pending.add(rule);
+        if (own(approved, rule) || trustedPaths.has(rule)) pending.add(rule);
       }
       dir = path.posix.dirname(dir);
     }
@@ -181,6 +207,16 @@ function sameTaskTree(state, captured) {
   assert(git(state.target.repo, ['merge-base', '--is-ancestor', state.target.initial_head, captured.head], true) !== null,
     'Current HEAD is not based on the original reviewed version');
 }
+function reviewInput(state, statePath) {
+  const filename = `${statePath}.review.json`;
+  const prior = fs.existsSync(filename) ? readJSON(filename) : null;
+  if (!prior || prior.candidate_id !== state.candidate.id || own(state.record_index, prior.id)) {
+    if (prior) atomicWrite(path.join(`${statePath}.evidence`, 'review-inputs', `${digest(stableJSON(prior))}.json`), `${JSON.stringify(prior, null, 2)}\n`);
+    atomicWrite(filename, `${JSON.stringify({ type: 'review', id: `review-${crypto.randomUUID()}`,
+      candidate_id: state.candidate.id, independent: false, summary: '', findings: [], key_code: [], checks: [] }, null, 2)}\n`);
+  }
+  return filename;
+}
 function prepare(state, statePath) {
   const repo = fs.realpathSync(gitText(path.resolve(values.repo ?? '.'), ['rev-parse', '--show-toplevel']));
   safeArtifact(repo, statePath);
@@ -228,7 +264,8 @@ function prepare(state, statePath) {
       reviews: [], checks: [], usage: [], commands: [], human: null, plan: null, approved_rules: {}, rule_decisions: [], record_index: {} };
     saveCandidate(state, captured, statePath);
   }
-  return { state, result: { task_id: state.task_id, read_only: state.read_only, candidate_id: state.candidate.id,
+  state.review_input = reviewInput(state, statePath);
+  return { state, result: { task_id: state.task_id, read_only: state.read_only, candidate_id: state.candidate.id, review_input: state.review_input,
     head_sha: state.candidate.head_sha, base_sha: state.target.base_sha, rules_sha: state.target.rules_sha,
     base_confirmed: state.target.base_confirmed, files: state.candidate.files,
     diff: state.candidate.diff, untracked: state.candidate.untracked,
@@ -256,10 +293,12 @@ function usageRecord(state, filename) {
   for (const key of ['input_tokens', 'output_tokens']) integer(state.usage.reduce((total, item) => total + item[key], 0), `total ${key}`);
   return { usage_records_added: added, note: 'Counts cover imported requests only. The CLI did not call a model.' };
 }
-function recordResult(state, statePath) {
-  assert(Boolean(values.file) !== Boolean(values['usage-file']), 'Supply exactly one of --file or --usage-file');
-  if (values['usage-file']) return usageRecord(state, values['usage-file']);
-  const data = readJSON(values.file);
+function recordResult(state, statePath, supplied = null, candidate = null) {
+  if (!supplied) {
+    assert(Boolean(values.file) !== Boolean(values['usage-file']), 'Supply exactly one of --file or --usage-file');
+    if (values['usage-file']) return usageRecord(state, values['usage-file']);
+  }
+  const data = supplied ?? readJSON(values.file);
   text(data.id, 'id');
   const recordHash = digest(stableJSON(data)), prior = own(state.record_index, data.id);
   if (prior) {
@@ -270,7 +309,7 @@ function recordResult(state, statePath) {
     setOwn(state.record_index ??= {}, data.id, { type: data.type, hash: recordHash });
     return result;
   };
-  const captured = current(state);
+  const captured = candidate ?? current(state);
   assert(captured.id === state.candidate.id && data.candidate_id === captured.id, 'Result must match the current prepared candidate; refresh or verify first');
   if (data.type === 'review') {
     const previous = state.reviews.find(item => item.id === data.id);
@@ -347,6 +386,9 @@ function validatePlan(plan) {
     text(check.argv[0], 'executable');
     assert(check.required == null || typeof check.required === 'boolean', 'required must be boolean');
     assert(check.timeout_ms == null || (Number.isSafeInteger(check.timeout_ms) && check.timeout_ms > 0 && check.timeout_ms <= 3600000), 'timeout_ms must be 1..3600000');
+    assert(check.env == null || (typeof check.env === 'object' && !Array.isArray(check.env)
+      && Object.entries(check.env).every(([key, value]) => key && !/[=\0]/.test(key) && typeof value === 'string' && !value.includes('\0'))), 'check.env must contain explicit string values');
+    resultSpecs(check.results);
   }
 }
 function verify(state, statePath) {
@@ -356,26 +398,50 @@ function verify(state, statePath) {
   if (captured.id !== state.candidate.id && state.reviews.length >= 3 && state.reviews.at(-1).data.findings.some(item => item.status === 'open' && item.blocking)) {
     throw new Error('Review budget exhausted with blockers; stop automatic repair and present a replan');
   }
-  if (captured.id !== state.candidate.id) saveCandidate(state, captured, statePath);
+  if (captured.id !== state.candidate.id) {
+    saveCandidate(state, captured, statePath);
+    state.review_input = reviewInput(state, statePath);
+  }
+  if (!state.review_input || !fs.existsSync(state.review_input)) state.review_input = reviewInput(state, statePath);
   state.plan = plan;
   const results = [];
   for (const check of plan.checks) {
     const stamp = now(), id = crypto.randomUUID();
     const cwd = path.resolve(state.target.repo, check.cwd ?? '.');
     assert(isWithin(state.target.repo, fs.realpathSync(cwd)), 'Check cwd must be inside the repository');
+    const declared = resultSpecs(check.results).map(spec => {
+      const filename = path.resolve(cwd, spec.path);
+      try { return { spec, filename, before: fileIdentity(filename) }; }
+      catch (error) { return { spec, filename, before: null, probe_error: error.message }; }
+    });
     const result = spawnSync(check.argv[0], check.argv.slice(1), { cwd, shell: false,
-      timeout: check.timeout_ms ?? 120000, maxBuffer: 8 * 1024 * 1024, windowsHide: true });
+      env: { ...process.env, ...check.env }, timeout: check.timeout_ms ?? 120000, maxBuffer: 8 * 1024 * 1024, windowsHide: true });
     const folder = `${statePath}.evidence/checks`, stdout = path.join(folder, `${id}.stdout.txt`), stderr = path.join(folder, `${id}.stderr.txt`);
     atomicWrite(stdout, result.stdout ?? Buffer.alloc(0));
     atomicWrite(stderr, Buffer.concat([result.stderr ?? Buffer.alloc(0), Buffer.from(result.error ? `\n${result.error.message}` : '')]));
     const entry = { record_id: id, name: check.name, candidate_id: captured.id, status: !result.error && result.status === 0 ? 'passed' : 'failed',
       required: check.required ?? true, observed_at: stamp, finished_at: now(), source: 'CLI execution',
       exit_code: result.status, signal: result.signal, stdout, stderr, argv: check.argv };
+    entry.results = [];
+    for (const { spec, filename, before, probe_error } of declared) {
+      try {
+        assert(!probe_error, `Could not inspect result before execution: ${probe_error}`);
+        const summary = readResult(filename, spec, before);
+        const evidence = path.join(folder, `${id}.result-${entry.results.length}.json`);
+        atomicWrite(evidence, summary.bytes);
+        entry.results.push({ source: filename, evidence, sha256: digest(summary.bytes), counts: summary.counts,
+          status: summary.status, required: spec.required ?? true });
+        if (summary.status === 'failed' && (spec.required ?? true)) entry.status = 'failed';
+      } catch (error) {
+        entry.results.push({ source: filename, status: 'unavailable', error: error.message, required: spec.required ?? true });
+        if (spec.required ?? true) entry.status = 'failed';
+      }
+    }
     state.checks.push(entry); results.push(entry);
   }
   const stable = current(state).id === captured.id;
-  return { candidate_id: captured.id, candidate_unchanged: stable,
-    checks: results.map(({ name, status, exit_code, stdout, stderr }) => ({ name, status, exit_code, stdout, stderr })),
+  return { candidate_id: captured.id, review_input: state.review_input, candidate_unchanged: stable,
+    checks: results.map(({ name, status, exit_code, stdout, stderr, results: summaries }) => ({ name, status, exit_code, stdout, stderr, results: summaries })),
     exit_code: stable && results.every(item => !item.required || item.status === 'passed') ? 0 : 1 };
 }
 function tokenStats(state) {
@@ -396,8 +462,8 @@ function tokenStats(state) {
     savings: null,
     note: 'No model calls. Actual usage is supplied by the host. Estimates cover CLI stdout only; no measured savings baseline.' };
 }
-function status(state) {
-  const captured = current(state), stale = captured.id !== state.candidate.id;
+function status(state, captured = current(state)) {
+  const stale = captured.id !== state.candidate.id;
   const review = state.reviews.at(-1), reviewCurrent = Boolean(review && !stale && review.data.candidate_id === captured.id);
   const findings = review?.data.findings ?? [], counts = { P0: 0, P1: 0, P2: 0 };
   for (const finding of findings) if (finding.status === 'open') counts[finding.priority]++;
@@ -431,14 +497,14 @@ function status(state) {
 }
 const md = value => String(value ?? '').replace(/[&<>]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[char]).replace(/[\\`*_[\]{}|#!]/g, '\\$&').replace(/\r?\n/g, ' ');
 const fileLink = (label, filename) => `[${md(label)}](${pathToFileURL(filename).href})`;
-function report(state, statePath) {
+function report(state, statePath, captured = current(state)) {
   text(values.output, '--output');
   const output = safeArtifact(state.target.repo, values.output);
-  assert(output !== statePath && !output.startsWith(`${statePath}.`), 'Report cannot overwrite state or its evidence');
-  const view = status(state), stats = tokenStats(state), review = state.reviews.at(-1)?.data;
+  assert(pathKey(output) !== pathKey(statePath) && !pathKey(output).startsWith(`${pathKey(statePath)}.`), 'Report cannot overwrite state or its evidence');
+  const view = status(state, captured), stats = tokenStats(state), review = state.reviews.at(-1)?.data;
   const lines = ['---', 'title: Code review lifecycle', 'subtitle: Recorded review evidence and final human check', 'template: doc', 'theme: blueprint', 'mode: light', 'lang: en', '---',
     '## A Review status', `PR: ${md(state.target.pr?.url ?? 'Local candidate')}`, `Commit: ${md(view.head_sha)}`,
-    `Candidate: ${view.current_candidate_id}`, `Phase: ${view.phase}`,
+    `Base: ${state.target.base_sha}`, `Candidate: ${view.current_candidate_id}`, `Phase: ${view.phase}`,
     `Unresolved P0: ${view.unresolved.P0} · P1: ${view.unresolved.P1} · P2: ${view.unresolved.P2}`,
     `AI reviews: ${view.completed_reviews}/3. Evidence stale: ${view.stale_evidence}. Review matches candidate: ${view.review_current}.`,
     `Independent review reported: ${view.review_independent ?? 'not supplied'}.`,
@@ -456,6 +522,16 @@ function report(state, statePath) {
   }
   lines.push('## C Checks and source evidence', '| Check | Result | Observed | Source |', '|---|---|---|---|');
   for (const check of state.checks) lines.push(`| ${md(check.name)} | ${md(check.status)}${check.candidate_id === view.current_candidate_id ? '' : ' (older candidate)'} | ${md(check.observed_at)} | ${md(check.source)} |`);
+  const expected = [view.head_sha, state.target.base_sha, view.current_candidate_id,
+    `Unresolved P0: ${view.unresolved.P0} · P1: ${view.unresolved.P1} · P2: ${view.unresolved.P2}`];
+  for (const check of state.checks) for (const item of check.results ?? []) {
+    if (item.counts) {
+      const count = item.counts;
+      const summary = `Tests run: ${count.run ?? 'unknown'}; passed: ${count.passed ?? 'unknown'}; failures: ${count.failures ?? 'unknown'}; errors: ${count.errors ?? 'unknown'}; skipped: ${count.skipped ?? 'unknown'}.`;
+      lines.push('', `${md(check.name)}: ${summary}`, fileLink('Result JSON snapshot', item.evidence));
+      expected.push(summary);
+    } else lines.push('', `${md(check.name)} result unavailable: ${md(item.error)}`);
+  }
   lines.push('', fileLink('Prepared full diff', state.candidate.diff));
   for (const rule of state.candidate.rules.files) lines.push(`- ${fileLink(rule.path, rule.evidence)} · ${md(rule.commit ?? rule.source)}`);
   for (const item of state.candidate.untracked) lines.push(`- New file ${md(item.path)}: ${item.evidence ? fileLink('snapshot', item.evidence) : md(item.note)}`);
@@ -472,15 +548,68 @@ function report(state, statePath) {
   'A recorded chat decision does not replace required platform approval or merge authorization. This page does not merge or approve a PR.');
   const draft = `${statePath}.report.md`;
   atomicWrite(draft, `${lines.join('\n')}\n`);
-  const result = spawnSync(process.execPath, [path.join(SCRIPT_DIR, 'render_html.mjs'), 'render', draft, '-o', output, '--no-open', '--theme', 'blueprint', '--mode', 'light'], { encoding: 'utf8', windowsHide: true, maxBuffer: 8 * 1024 * 1024 });
-  assert(!result.error && result.status === 0, `Report renderer failed: ${result.stderr ?? result.error?.message ?? ''}`);
-  return { output, draft, candidate_id: view.current_candidate_id, ready_for_final_check: view.ready_for_final_check, model_usage: stats.model_usage };
+  const temporary = `${output}.${crypto.randomUUID()}.html`;
+  let validation;
+  try {
+    const result = spawnSync(process.execPath, [path.join(SCRIPT_DIR, 'render_html.mjs'), 'render', draft, '-o', temporary, '--no-open', '--theme', 'blueprint', '--mode', 'light'], { encoding: 'utf8', windowsHide: true, maxBuffer: 8 * 1024 * 1024 });
+    assert(!result.error && result.status === 0, `Report renderer failed: ${result.stderr ?? result.error?.message ?? ''}`);
+    validation = checkReport(temporary, expected);
+    assert(current(state).id === captured.id, 'Candidate changed during report generation; evidence remains tied to its original candidate');
+    atomicWrite(output, fs.readFileSync(temporary));
+  } finally { if (fs.existsSync(temporary)) fs.unlinkSync(temporary); }
+  return { output, draft, candidate_id: view.current_candidate_id, ready_for_final_check: view.ready_for_final_check, validation, model_usage: stats.model_usage };
+}
+function finish(state, statePath) {
+  text(values.output, '--output');
+  safeArtifact(state.target.repo, values.output);
+  const inputPath = values.file ?? state.review_input ?? `${statePath}.review.json`;
+  assert(pathKey(values.output) !== pathKey(inputPath), 'Report cannot overwrite its review input');
+  assert(pathKey(inputPath) !== pathKey(`${statePath}.report.md`), 'Review input collides with the reserved report draft; use prepare\'s review_input');
+  const input = readJSON(inputPath);
+  assert(input.type === 'review', 'finish accepts a completed review only');
+  const captured = current(state);
+  sameTaskTree(state, captured);
+  assert(captured.id === state.candidate.id && input.candidate_id === captured.id, 'Review input must match the current prepared candidate');
+  assert(input.checks == null || Array.isArray(input.checks), 'review.checks must be an array');
+  const data = structuredClone(input);
+  for (const item of data.key_code ?? []) {
+    if (item.code != null) continue;
+    text(item.path, 'key_code.path');
+    const filename = path.resolve(state.target.repo, item.path);
+    const relative = path.relative(state.target.repo, filename).split(path.sep).join('/');
+    assert(isWithin(state.target.repo, filename) && fs.lstatSync(filename).isFile()
+      && isWithin(state.target.repo, fs.realpathSync(filename)), 'Code excerpt must be a regular repository file');
+    assert(git(state.target.repo, ['--literal-pathspecs', 'ls-files', '--error-unmatch', '--', relative], true) !== null
+      || state.candidate.untracked.some(entry => entry.path === relative && entry.kind === 'file'), 'Code excerpt must belong to the candidate');
+    assert(Number.isSafeInteger(item.start_line) && Number.isSafeInteger(item.end_line)
+      && item.start_line > 0 && item.end_line >= item.start_line && item.end_line-item.start_line < 200, 'Code range must contain 1..200 lines');
+    const source = fs.readFileSync(filename, 'utf8').split(/\r?\n/);
+    assert(item.end_line <= source.length, 'Code range exceeds file');
+    item.code = source.slice(item.start_line-1, item.end_line).join('\n');
+    item.location = `${item.path}:${item.start_line}`;
+  }
+  const observations = data.checks ?? [];
+  delete data.checks;
+  const recorded = recordResult(state, statePath, data, captured);
+  for (const [index, check] of observations.entries()) recordResult(state, statePath,
+    { ...check, type: 'check', id: check.id ?? `${input.id}:check:${index}`, candidate_id: input.candidate_id }, captured);
+  try {
+    const page = report(state, statePath, captured), view = status(state, captured);
+    return { candidate_id: captured.id, review_round: recorded.review_round ?? state.reviews.find(item => item.id === input.id)?.round,
+      duplicate: recorded.duplicate ?? false, unresolved: view.unresolved, ready_for_final_check: view.ready_for_final_check,
+      human_decision: view.human_decision, output: page.output, draft: page.draft, validation: page.validation,
+      checks: view.checks, exit_code: 0 };
+  } catch (error) {
+    // The review really completed. Preserve it, so retrying publication cannot spend another round.
+    return { candidate_id: captured.id, review_recorded: true, completed_reviews: state.reviews.length,
+      error: error.message, retry: 'Retry finish with the same input after fixing the report issue; do not prepare a new review', exit_code: 2 };
+  }
 }
 function main() {
   const parsed = parseArgs({ options: Object.fromEntries(Object.entries(optionTypes).map(([key, type]) => [key, { type }])), allowPositionals: true });
   values = parsed.values; command = parsed.positionals[0];
-  if (values.help || !command || command === 'help') { process.stdout.write(HELP); return; }
-  assert(['prepare', 'verify', 'record', 'status', 'stats', 'report'].includes(command), 'Unknown command; use --help');
+  if (values.help || !command || command === 'help') { process.stdout.write(COMMAND_HELP[command] ?? HELP); return; }
+  assert(['prepare', 'verify', 'finish', 'record', 'status', 'stats', 'report'].includes(command), 'Unknown command; use --help');
   assert(parsed.positionals.length === 1, 'Unexpected positional arguments');
   const statePath = path.resolve(text(values.state, '--state'));
   const existing = fs.existsSync(statePath) ? readJSON(statePath) : null;
@@ -500,6 +629,7 @@ function main() {
     try {
       if (command === 'prepare') ({ state, result } = prepare(state, statePath));
       else if (command === 'verify') { result = verify(state, statePath); exitCode = result.exit_code; }
+      else if (command === 'finish') { result = finish(state, statePath); exitCode = result.exit_code; }
       else if (command === 'record') result = recordResult(state, statePath);
       else if (command === 'status') {
         result = status(state);

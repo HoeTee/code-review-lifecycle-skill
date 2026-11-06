@@ -199,6 +199,165 @@ class ReviewCLITests(unittest.TestCase):
                  'decision': 'approve', 'actor': 'fixture', 'source': 'test', 'evidence': 'test'}
         self.record(human, expected=2)
 
+    def test_finish_uses_generated_input_and_batches_checks_and_report(self):
+        prepared = self.prepare('--read-only')
+        draft = Path(prepared['review_input'])
+        review = json.loads(draft.read_text(encoding='utf-8'))
+        self.assertEqual(review['candidate_id'], prepared['candidate_id'])
+        self.assertFalse(review['independent'])
+        self.call('verify', '--plan', self.plan('assert True'))
+        review.update(summary='Checked the behavior and consumer.', independent=True)
+        review['key_code'] = [{'path': 'feature.py', 'start_line': 1, 'end_line': 1,
+                              'explanation': 'The existing value remains one.'}]
+        review['checks'] = [{'name': 'Word UAT', 'source': 'Project requirements', 'evidence': 'Outside offline scope',
+                             'observed_at': '2026-11-07T00:00:00Z', 'required': True, 'status': 'not_run'}]
+        draft.write_text(json.dumps(review), encoding='utf-8')
+        output = self.root / 'report.html'
+        result = self.call('finish', '--output', output)
+        self.assertEqual(result['review_round'], 1)
+        self.assertTrue(result['validation']['body_verified'])
+        self.assertFalse(result['ready_for_final_check'])
+        self.assertIsNone(result['human_decision'])
+        self.assertIn('VALUE = 1', output.read_text(encoding='utf-8'))
+        retry = self.call('finish', '--output', output)
+        self.assertTrue(retry['duplicate'])
+        self.assertEqual(self.call('status')['completed_reviews'], 1)
+
+    def test_finish_report_failure_keeps_review_and_retry_does_not_add_round(self):
+        prepared = self.prepare()
+        filename = Path(prepared['review_input'])
+        data = json.loads(filename.read_text(encoding='utf-8'))
+        data.update(summary='Completed review.', independent=True)
+        filename.write_text(json.dumps(data), encoding='utf-8')
+        blocker = self.root / 'not-a-directory'
+        blocker.write_text('retained', encoding='utf-8')
+        failure = self.call('finish', '--output', blocker / 'report.html', expected=2)
+        self.assertTrue(failure['review_recorded'])
+        self.assertEqual(self.call('status')['completed_reviews'], 1)
+        result = self.call('finish', '--output', self.root / 'fixed-report.html')
+        self.assertTrue(result['duplicate'])
+        self.assertEqual(result['review_round'], 1)
+        self.assertEqual(blocker.read_text(encoding='utf-8'), 'retained')
+
+    def test_finish_rejects_empty_or_stale_review_without_recording_it(self):
+        self.prepare()
+        output = self.root / 'report.html'
+        self.call('finish', '--output', output, expected=2)
+        self.assertEqual(self.call('status')['completed_reviews'], 0)
+        filename = Path(json.loads(self.state.read_text(encoding='utf-8'))['review_input'])
+        data = json.loads(filename.read_text(encoding='utf-8'))
+        data.update(summary='Review of old content.', independent=True)
+        filename.write_text(json.dumps(data), encoding='utf-8')
+        self.write('feature.py', 'VALUE = 2\n')
+        self.call('finish', '--output', output, expected=2)
+        self.assertEqual(self.call('status')['completed_reviews'], 0)
+        self.assertFalse(output.exists())
+
+    def test_finish_never_overwrites_input_at_the_reserved_report_draft(self):
+        prepared = self.prepare()
+        original = json.loads(Path(prepared['review_input']).read_text(encoding='utf-8'))
+        original.update(summary='Completed review.', independent=True)
+        reserved = Path(str(self.state)+'.report.md')
+        reserved.write_text(json.dumps(original), encoding='utf-8')
+        before = reserved.read_bytes()
+        result = self.call('finish', '--file', reserved, '--output', self.root/'report.html', expected=2)
+        self.assertIn('reserved report draft', result['error'])
+        self.assertEqual(reserved.read_bytes(), before)
+        self.assertEqual(self.call('status')['completed_reviews'], 0)
+
+    def test_repair_verification_refreshes_the_default_review_input(self):
+        prepared = self.prepare()
+        filename = Path(prepared['review_input'])
+        first = json.loads(filename.read_text(encoding='utf-8'))
+        first.update(summary='First review completed.', independent=True)
+        filename.write_text(json.dumps(first), encoding='utf-8')
+        self.call('finish', '--output', self.root/'first.html')
+        self.write('feature.py', 'VALUE = 2\n')
+        self.call('verify', '--plan', self.plan("from pathlib import Path; assert 'VALUE = 2' in Path('feature.py').read_text()"))
+        second = json.loads(filename.read_text(encoding='utf-8'))
+        self.assertNotEqual(first['candidate_id'], second['candidate_id'])
+        self.assertNotEqual(first['id'], second['id'])
+        self.assertEqual(second['summary'], '')
+        self.assertFalse(second['independent'])
+        second.update(summary='Re-reviewed the repaired candidate.', independent=True)
+        filename.write_text(json.dumps(second), encoding='utf-8')
+        result = self.call('finish', '--output', self.root/'second.html')
+        self.assertEqual(result['review_round'], 2)
+        self.assertTrue(result['ready_for_final_check'])
+        self.assertTrue(list(Path(str(self.state)+'.evidence/review-inputs').glob('*.json')))
+
+    def test_code_excerpt_membership_uses_literal_paths(self):
+        self.write('picka.py', 'SAFE = 1\n')
+        self.git('add', 'picka.py')
+        self.git('commit', '-m', 'tracked source')
+        self.write('.gitignore', 'pick*\n')
+        self.write('pick[a].py', 'PRIVATE_FIXTURE = 1\n')
+        self.assertNotIn('pick[a].py', self.git('ls-files', '--others', '--exclude-standard'))
+        prepared = self.prepare()
+        filename = Path(prepared['review_input'])
+        data = json.loads(filename.read_text(encoding='utf-8'))
+        data.update(summary='Reviewed the actual candidate.', independent=True)
+        data['key_code'] = [{'path': 'pick[a].py', 'start_line': 1, 'end_line': 1, 'explanation': 'Not a candidate file.'}]
+        filename.write_text(json.dumps(data), encoding='utf-8')
+        result = self.call('finish', '--output', self.root/'report.html', expected=2)
+        self.assertIn('belong to the candidate', result['error'])
+        self.assertEqual(self.call('status')['completed_reviews'], 0)
+
+    def test_verify_collects_fresh_json_and_env_without_wrapper_script(self):
+        self.write('.gitignore', 'results.json\n')
+        self.prepare()
+        code = ("import os,json; from pathlib import Path; "
+                "assert os.environ['CRL_FIXTURE']=='explicit'; "
+                "Path('results.json').write_text(json.dumps({'run':5,'failures':0,'errors':0,'skipped':[{'reason':'Windows'}]}))")
+        spec = {'path': 'results.json', 'fields': {key: '/' + key for key in ('run', 'failures', 'errors', 'skipped')}}
+        plan = self.data('plan.json', {'checks': [{'name': 'unit', 'argv': [sys.executable, '-B', '-c', code],
+                                                  'env': {'CRL_FIXTURE': 'explicit'}, 'results': [spec]}]})
+        result = self.call('verify', '--plan', plan)
+        counts = result['checks'][0]['results'][0]['counts']
+        self.assertEqual(counts, {'run': 5, 'failures': 0, 'errors': 0, 'skipped': 1, 'passed': 4})
+        filename = Path(json.loads(self.state.read_text(encoding='utf-8'))['review_input'])
+        review = json.loads(filename.read_text(encoding='utf-8'))
+        review.update(summary='Reviewed offline behavior.', independent=True)
+        filename.write_text(json.dumps(review), encoding='utf-8')
+        output = self.root / 'report.html'
+        self.call('finish', '--output', output)
+        self.assertIn('Tests run: 5; passed: 4; failures: 0; errors: 0; skipped: 1.', output.read_text(encoding='utf-8'))
+        self.write('results.json', 'not the captured evidence')
+        snapshot = Path(result['checks'][0]['results'][0]['evidence'])
+        self.assertEqual(json.loads(snapshot.read_text(encoding='utf-8'))['run'], 5)
+
+    def test_unchanged_missing_or_failing_json_cannot_pass_required_check(self):
+        self.write('.gitignore', 'results.json\n')
+        self.prepare()
+        self.write('results.json', json.dumps({'run': 3, 'errors': 0}))
+        spec = {'path': 'results.json', 'fields': {'run': '/run', 'errors': '/errors'}}
+        plan = self.data('plan.json', {'checks': [{'name': 'unit', 'argv': [sys.executable, '-B', '-c', 'pass'], 'results': [spec]}]})
+        result = self.call('verify', '--plan', plan, expected=1)
+        self.assertIn('not refreshed', result['checks'][0]['results'][0]['error'])
+        (self.repo / 'results.json').unlink()
+        result = self.call('verify', expected=1)
+        self.assertIn('not produced', result['checks'][0]['results'][0]['error'])
+        code = "from pathlib import Path; Path('results.json').write_text('{\"run\":3,\"errors\":1}')"
+        plan = self.data('plan-failure.json', {'checks': [{'name': 'unit', 'argv': [sys.executable, '-B', '-c', code], 'results': [spec]}]})
+        result = self.call('verify', '--plan', plan, expected=1)
+        self.assertEqual(result['checks'][0]['exit_code'], 0)
+        self.assertEqual(result['checks'][0]['status'], 'failed')
+
+    def test_invalid_result_file_preserves_preceding_executed_checks(self):
+        (self.repo/'folder').mkdir()
+        self.prepare()
+        plan = self.data('plan.json', {'checks': [
+            {'name': 'first', 'argv': [sys.executable, '-B', '-c', 'print("executed")']},
+            {'name': 'invalid-result', 'argv': [sys.executable, '-B', '-c', 'pass'],
+             'results': [{'path': 'folder', 'fields': {'run': '/run'}}]},
+        ]})
+        result = self.call('verify', '--plan', plan, expected=1)
+        self.assertEqual([c['status'] for c in result['checks']], ['passed', 'failed'])
+        self.assertIn('regular file', result['checks'][1]['results'][0]['error'])
+        state = json.loads(self.state.read_text(encoding='utf-8'))
+        self.assertEqual(len(state['checks']), 2)
+        self.assertIn('executed', Path(state['checks'][0]['stdout']).read_text(encoding='utf-8'))
+
     def test_existing_task_cannot_be_reset_or_moved_to_another_branch(self):
         self.prepare()
         self.record(self.review())

@@ -8,11 +8,8 @@
 
 ```sh
 node /ABSOLUTE/SKILL/scripts/crl.mjs prepare --repo /ABSOLUTE/REPO --state /ABSOLUTE/task.json --base CONFIRMED_BASE
-node /ABSOLUTE/SKILL/scripts/crl.mjs status --state /ABSOLUTE/task.json
 node /ABSOLUTE/SKILL/scripts/crl.mjs verify --state /ABSOLUTE/task.json --plan /ABSOLUTE/checks.json
-node /ABSOLUTE/SKILL/scripts/crl.mjs record --state /ABSOLUTE/task.json --file /ABSOLUTE/review.json
-node /ABSOLUTE/SKILL/scripts/crl.mjs report --state /ABSOLUTE/task.json --output /ABSOLUTE/task.html
-node /ABSOLUTE/SKILL/scripts/crl.mjs stats --state /ABSOLUTE/task.json
+node /ABSOLUTE/SKILL/scripts/crl.mjs finish --state /ABSOLUTE/task.json --output /ABSOLUTE/task.html
 ```
 
 上面的路径与基线由 Agent 根据当前任务填写，用户无需提供这些技术参数。任务文件放在已约定的产物目录，位于工作树之外或 Git 忽略目录。状态、证据和页面分别存放；不写到源码文件。一个任务复用同一状态文件，多个任务分开保存。
@@ -31,6 +28,8 @@ Agent 先识别用户明确关联的 PR、本地候选和可信比较基线，�
 
 准备结果给出候选 ID、diff、规则与新文件证据位置。Agent 必须读取完整适用规则、首轮完整 diff 和必要调用链，不能把短 JSON 当作已经审查。
 
+同时返回 `review_input` 文件，已填写记录 ID 与候选 ID。直接补充语义内容，保留这些自动字段。空 summary 不能提交；`independent` 默认 false，确有独立上下文才改为 true。刷新未完成候选时保留同版本草稿；prepare 或 verify 捕获新候选后自动生成新稿并归档旧稿，轮次仍沿任务累计。
+
 `prepare --refresh` 更新同一任务的候选，保留审查历史和轮次；不得通过另建任务清零。本地修复后 `verify` 也会在原任务分支上捕获新候选，旧审查与旧检查不自动变为新版本证据。新基线、PR 元数据和规则来源的调整必须有对应事实或用户确认，不能借此降低规则。
 
 本地任务创建 PR 后，`prepare --refresh --pr-file ...` 关联该 PR；需匹配当前干净候选，不换任务或清零。取得新的可信基线或已确认的规则提交时，可在同一 refresh 中传入 `--base` 或 `--rules-ref`。规则身份参与候选 ID，受影响证据重新核对。
@@ -48,12 +47,30 @@ Agent 先识别用户明确关联的 PR、本地候选和可信比较基线，�
 | `required` | 是否必需，默认 true |
 | `cwd` | 仓库内工作目录，默认根目录 |
 | `timeout_ms` | 1 到 3600000，默认 120000 |
+| `env` | 可选的明确环境变量字符串映射，直接传给子进程，不需要额外 shell 包装 |
+| `results` | 可选结果数组，每项有 path、fields 及可选 required（默认 true） |
 
 命令不经隐式 shell。需要 shell 功能时，计划明确列出 shell 可执行文件及参数。Windows 的 `.cmd` 入口也应通过明确的宿主执行方式调用。CLI 不拼接不可信 shell 字符串。
 
 首次传入 `--plan`；后续 `verify` 可复用该计划。计划必须来自项目必需检查与 Agent 的语义判断，CLI 不会从自然语言生成测试。
 
 每次保存候选 ID、实际命令、退出状态、时间和 stdout/stderr。必需检查失败返回 1；输入或执行准备错误返回 2。检查改变候选内容时标为证据失效，不请求最终批准。CLI 只知道已登记的检查，Agent 还需核对项目和平台的完整要求。
+
+例如，已有 JSON 提供 run、failures、errors、skipped 时，登记 `{"path":"data/results.json","fields":{"run":"/run","failures":"/failures","errors":"/errors","skipped":"/skipped"}}`。fields 使用明确 JSON pointer；后三项可从数组长度计数。工具保存本轮新生成的原始文件快照与计数，不解析自然语言日志或调用模型。路径相对检查 cwd，映射随计划复用，不写入某个项目的业务规则。
+
+必需结果缺失、未更新、格式错误、计数矛盾、无测试或存在失败/错误时，检查失败。命令非零退出不能被 JSON 中的成功计数覆盖。跳过按实际数量报告；项目的必需集成检查仍按原命令与规则执行。未声明或未提供的计数保持未知。
+
+## finish：一次提交审查
+
+默认读取 `review_input`，也可用 `--file` 指定。Agent 填写 summary、independent、findings，以及需要的 key_code 和 checks，不重复抄写版本、命令、测试计数或完整状态。
+
+`key_code` 可用 `{path,start_line,end_line,explanation}`，工具从同一候选提取 1 到 200 行原文；也兼容明确的 location/code/explanation。原文一律作为不可执行的文本展示。
+
+`checks` 可同时提交平台观察或明确未运行项，每项给 name、source、evidence、带时区的 observed_at、required 和 status。候选与默认 ID 自动补入，来源始终标为导入，不冒充 CLI 执行。
+
+一次 finish 记录该轮及观察，核对版本与状态，渲染报告并检查正文节点、计数、版本和本地证据链接，排除 head、源脚本及明确隐藏的子树，返回短摘要与路径。无需再逐个 record、status、report，也不另生成组织数据或检查 HTML 的脚本。这是结构和转录检查，不认证任意 CSS/JS 的最终可见性；语义和业务完整性仍需 Agent 核对。退出 0 表示报告成功交付，是否可进入最终人审看 ready_for_final_check，不能只看退出码。
+
+渲染或页面核对失败时保存已完成轮次，修好问题后用同一输入重试 finish，不先 prepare 新草稿。重复内容不多计轮；输入或候选变化不能套用旧结论。工具不生成缺陷判断，也不记录人工批准。返修前保存已完成轮次，沿原三轮上限继续。
 
 ## record：增量记录，不代替判断
 
@@ -118,6 +135,6 @@ node /ABSOLUTE/SKILL/scripts/crl.mjs record --state /ABSOLUTE/task.json --usage-
 
 ## report 与恢复
 
-报告复用随包渲染器，从已有记录生成；保留实际证据时间、版本、P0/P1/P2、检查日志、关键片段和人审状态。规则与完整 diff 提供证据入口。页面仍按 [页面检查](progress-interaction.md#核对页面) 检查，不做报告截图。
+正常流程使用 finish；`report` 用于从已有记录重新渲染。报告复用随包渲染器，自动保留版本、P0/P1/P2、命令日志、测试结果快照、关键片段与人审状态。写入最终页面前检查实际正文与本地证据链接，并再次核对候选。失败保留上一份页面。自动结构检查不能代替语义核对，按 [页面检查](progress-interaction.md#核对页面) 补核当前任务内容，不做报告截图。
 
 任务状态采用锁与原子替换。锁冲突时先核对锁中进程和归属；不要自动删除未知执行者的锁。失败记录保留实际状态，重试复用原任务和记录 ID。CLI 不能保证外部工具不改文件，执行前后仍核对候选。
