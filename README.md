@@ -52,9 +52,9 @@ Start with local changes, an open PR, or a revised commit. The agent determines 
 
 ## Workflow
 
-![HTML review brief for illustrative PR 42 at commit a1b2c3d, showing the AI finding, fix evidence, CI result, and pending human decision.](docs/media/export-review-preview.png)
+![Code Review Lifecycle workflow: trusted rules, pinned scope and version, bounded AI review and authorized repair, a local-report exit, PR and CI evidence, human decisions, and authorized merge handoff.](docs/media/review-workflow.png)
 
-*Screenshot of the bundled HTML renderer. PR #42 and commit a1b2c3d are illustrative. [Read the example brief](docs/showcase/export-review.md).*
+*The Skill’s workflow, generated as a dedicated HTML guide with Answer me with HTML. [View full-size diagram](docs/media/review-workflow.svg) · [HTML guide to open locally](docs/showcase/review-workflow.html) · [Guide source](docs/showcase/review-workflow.md).*
 
 1. **Review the change.** Read trusted repository rules and pin the review scope and version. AI checks the affected code and records findings.
 2. **Revise and verify.** With authorization, fix confirmed problems and re-review. Match required checks to the current commit. Local and PR reviews share a default total of three AI rounds.
@@ -89,7 +89,9 @@ A user queues a CSV export, then loses access before the worker runs. The review
 
 With fixes authorized, the author adds a permission check at execution time and a regression test. Re-review confirms that revoked access prevents file creation and checks the CI result for that commit. A person then decides whether `Export unavailable` explains the outcome clearly enough.
 
-[Read the example brief](docs/showcase/export-review.md).
+![Illustrative HTML review brief for PR 42 at commit a1b2c3d, showing a resolved AI finding and a pending human decision.](docs/media/export-review-preview.png)
+
+*Illustrative case. [Read the example brief](docs/showcase/export-review.md).*
 
 <details>
 <summary><strong>Render this example locally</strong></summary>

@@ -52,9 +52,9 @@ code-review-lifecycle スキルを使って、変更をレビューしてくだ�
 
 ## レビューの流れ
 
-![架空の PR 42、コミット a1b2c3d の HTML レビュー資料。AI の指摘、修正の証拠、CI 結果、人による未完了の判断を示す。](media/export-review-preview.png)
+![スキル全体の流れ。信頼できるルール、対象バージョン、AI レビューと許可された修正、ローカル報告、PR と CI、人の判断、許可に基づくマージの引き継ぎ。](media/review-workflow.png)
 
-*同梱の HTML レンダラーで生成したページのスクリーンショットです。PR #42 とコミット a1b2c3d は説明用の架空の例です。[レビュー資料を読む](showcase/export-review.md)。*
+*Answer me with HTML で専用のワークフロー紹介ページを生成しました。[図を原寸で見る](media/review-workflow.svg) · [HTML を保存してローカルで開く](showcase/review-workflow.html) · [内容の原稿](showcase/review-workflow.md)。*
 
 1. **変更をレビューする。** 信頼できるリポジトリルールを読み、対象範囲とバージョンを固定します。AI が影響するコードを確認し、指摘を記録します。
 2. **修正して検証する。** 許可を受けて問題を修正し、再レビューします。必須検証を現在のコミットに対応させます。AI レビューはローカルから PR まで、既定で合計最大 3 回です。
@@ -89,7 +89,9 @@ Claude Code チームの早期レビュー、レビュー回数の上限、重�
 
 修正の許可を受けた作成者が実行時の権限確認と回帰テストを追加します。再レビューで権限取り消し後にファイルを生成しないことと、対象コミットの CI を確認します。`Export unavailable` という表示で結果を理解できるかは、人が判断します。
 
-[レビュー資料を読む](showcase/export-review.md)。
+![架空の PR 42、コミット a1b2c3d の HTML レビュー例。AI の指摘は対応済みで、人の判断を待っている。](media/export-review-preview.png)
+
+*説明用の架空の例です。[レビュー資料を読む](showcase/export-review.md)。*
 
 <details>
 <summary><strong>例のページをローカルで生成する</strong></summary>

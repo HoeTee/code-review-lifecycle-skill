@@ -52,9 +52,9 @@ npx skills add HoeTee/code-review-lifecycle-skill --agent codex claude-code open
 
 ## 审查流程
 
-![虚构 PR 42、提交 a1b2c3d 的 HTML 审核材料，展示 AI 发现、修复证据、CI 结果和待完成的人工决定。](media/export-review-preview.png)
+![整个 Skill 的工作流：可信规则、固定范围与版本、AI 审查与授权返修、本地报告出口、PR 与 CI、人工决定及按授权合并交接。](media/review-workflow.png)
 
-*随包 HTML 渲染器生成页面的截图。PR #42 和提交 a1b2c3d 为说明流程的虚构内容。[查看示例材料](showcase/export-review.md)。*
+*使用 Answer me with HTML 单独生成的工作流介绍图。[查看完整尺寸](media/review-workflow.svg) · [下载并本地打开 HTML 介绍页](showcase/review-workflow.html) · [内容源稿](showcase/review-workflow.md)。*
 
 1. **审查改动。** 读取可信仓库规则，固定审查范围与版本。AI 检查受影响代码并记录发现。
 2. **返修与验证。** 获准后修复确认的问题，再复审。必需检查对应当前提交。本地和 PR 审查默认合计最多三轮 AI 审查。
@@ -89,7 +89,9 @@ npx skills add HoeTee/code-review-lifecycle-skill --agent codex claude-code open
 
 获准返修后，作者补上执行时的权限检查和回归测试。复审确认权限撤回后不会生成文件，并核对对应提交的 CI。人再判断 `Export unavailable` 是否解释清楚了结果。
 
-[查看示例材料](showcase/export-review.md)。
+![虚构 PR 42、提交 a1b2c3d 的 HTML 审核报告示例，展示已处理的 AI 发现和待完成的人工决定。](media/export-review-preview.png)
+
+*这是虚构案例。[查看示例材料](showcase/export-review.md)。*
 
 <details>
 <summary><strong>在本地生成示例页面</strong></summary>
