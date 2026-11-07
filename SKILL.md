@@ -45,7 +45,7 @@ Codex、Claude Code 和 OpenCode 共用此入口。用户只需说「做下 code
 
 每次实质性答复同时给聊天正文和 HTML 页面。正文说明受审对象、主要发现、已验证与未验证范围、待决定事项及下一步。普通工具旁白无需生成页面。用户明确要求其他呈现时按该次要求。
 
-HTML 使用随包的 `scripts/render_html.mjs`，需要 Node.js 20 或更新版本。默认浅色图纸。任务更新沿用固定入口。缺少运行环境或渲染失败时，说明缺项并继续给出聊天结果。命令、状态格式和交互见 [进度与交互](references/progress-interaction.md)。
+HTML 统一使用随包的 `scripts/render_html.mjs`，无需单独安装 `answer-me-with-html` skill。只生成 HTML，默认紧凑浅色图纸（sheet / blueprint / light），保留原版 header、字号、表格、SVG 与自动布局，隐藏工具栏。默认署名和链接沿用 code-review-lifecycle-skill，用户可指定整行署名。任务更新沿用固定入口。需要 Node.js 20 或更新版本；缺少运行环境或渲染失败时说明缺项，继续给出聊天结果。命令和交互见 [进度与交互](references/progress-interaction.md)，草稿与页首字段见 [HTML 内容模型](references/html-explainer.md)。
 
 截图和视觉验收用于被审查产品的界面。`answer-me-with-html` 生成的说明页、进度页和审查报告不做截图或视觉验收，按 [页面检查规则](references/progress-interaction.md#核对页面) 核对生成结果。
 

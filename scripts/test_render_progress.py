@@ -4,6 +4,7 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -202,6 +203,7 @@ class ProgressStateTests(unittest.TestCase):
             page = output.read_text(encoding="utf-8")
             self.assertTrue("<title>CSV export access review</title>" in page, "Expected the README example title")
             self.assert_project_credit(page)
+            self.assert_page_options(page)
 
             panel = workdir / "decision.md"
             panel.write_text("## D Human decision {span=2}\n\nThe reviewer approved the failure message.\n", encoding="utf-8")
@@ -214,6 +216,126 @@ class ProgressStateTests(unittest.TestCase):
             self.assertIn("The reviewer approved the failure message.", visible)
             self.assertNotIn("Check the failure message", visible)
             self.assert_project_credit(page)
+            self.assert_page_options(page)
+
+    def assert_page_options(self, page: str):
+        overlay = page.split('<style id="crl-page-style">', 1)[1].split('</style>', 1)[0]
+        self.assertEqual(re.sub(r'/\*.*?\*/', '', overlay, flags=re.S).strip(), '.am-toolbar { display: none; }')
+        self.assertEqual(page.count('id="crl-page-style"'), 1)
+        self.assertEqual(page.count('<!-- answer-me-with-html licenses'), 1)
+        self.assertIn('Copyright (c) 2026 Answer me with HTML contributors', page)
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js is needed for the bundled renderer")
+    def test_original_header_metadata_styles_and_components_are_preserved(self):
+        with TemporaryDirectory() as directory:
+            workdir = Path(directory)
+            draft = workdir / 'draft.md'
+            raw = workdir / 'raw.html'
+            output = workdir / 'answer.html'
+            draft.write_text('\n'.join([
+                '---', 'title: 字段映射示例', 'subtitle: 文档范围与结论',
+                'author: 示例作者', 'date: 2026-11-06', 'version: v1.0',
+                'scope: 示例范围', 'source: 示例记录', 'template: sheet',
+                'theme: shadcn', 'mode: dark', '---',
+                '## A 正文 {meta="面板说明"}', '```flow', '草稿 -> HTML', '```',
+            ]), encoding='utf-8')
+            self.run_render('node', str(RENDERER), 'render', str(draft), '-o', str(raw),
+                            '--no-open', workdir=workdir)
+            self.run_render('node', str(SCRIPTS / 'render_html.mjs'), 'render', str(draft),
+                            '-o', str(output), workdir=workdir)
+            original = raw.read_text(encoding='utf-8')
+            page = output.read_text(encoding='utf-8')
+            self.assertIn('data-theme="shadcn" data-mode="dark"', page)
+            self.assertEqual(page.split('<style>', 1)[1].split('</style>', 1)[0],
+                             original.split('<style>', 1)[1].split('</style>', 1)[0])
+            header = lambda html: re.sub(r'<p class="am-colophon">.*?</p>', '',
+                                         html.split('<header class="am-head">', 1)[1].split('</header>', 1)[0], flags=re.S)
+            self.assertEqual(header(page), header(original))
+            for value in ('字段映射示例', '文档范围与结论', '示例作者', '2026-11-06', 'v1.0', '示例范围', '示例记录'):
+                self.assertIn(value, header(page))
+            self.assertIn('>面板说明</span>', page)
+            self.assertIn('<svg', page)
+            self.assert_page_options(page)
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js is needed for the bundled renderer")
+    def test_custom_or_hidden_credit_survives_a_patch(self):
+        with TemporaryDirectory() as directory:
+            workdir = Path(directory)
+            output = workdir / 'answer.html'
+            panel = workdir / 'panel.md'
+            panel.write_text('## D Human decision\n\nA final decision is recorded.\n', encoding='utf-8')
+            for footer in ('我的团队 <script>alert(1)</script> $& </script>', ''):
+                self.run_render('node', str(SCRIPTS / 'render_html.mjs'), 'render', str(SHOWCASE),
+                                '-o', str(output), '--footer', footer, workdir=workdir)
+                self.run_render('node', str(SCRIPTS / 'render_html.mjs'), 'patch', str(output),
+                                '--panel', 'D', '--from', str(panel), workdir=workdir)
+                page = output.read_text(encoding='utf-8')
+                data = page.split('<script id="crl-page-options" type="application/json">', 1)[1].split('</script>', 1)[0]
+                self.assertEqual(json.loads(data)['footer'], footer)
+                self.assertNotIn('<script>alert(1)</script>', page)
+                if footer:
+                    self.assertIn('我的团队 &lt;script&gt;alert(1)&lt;/script&gt; $&amp; &lt;/script&gt;</p>', page)
+                else:
+                    self.assertNotIn('<p class="am-colophon">', page)
+                self.assert_page_options(page)
+            self.run_render('node', str(SCRIPTS / 'render_html.mjs'), 'render', str(SHOWCASE),
+                            '-o', str(output), workdir=workdir)
+            self.assert_project_credit(output.read_text(encoding='utf-8'))
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js is needed for the bundled renderer")
+    def test_progress_credit_setting_reaches_the_bundled_entry(self):
+        with TemporaryDirectory() as directory:
+            workdir = Path(directory)
+            self.state['presentation'] = {'footer': '- 指定团队'}
+            state_path = workdir / 'state.json'
+            state_path.write_text(json.dumps(self.state), encoding='utf-8')
+            output = workdir / 'progress.html'
+            self.run_render(sys.executable, '-B', str(SCRIPTS / 'render_progress.py'),
+                            str(state_path), '--output', str(output), workdir=workdir)
+            page = output.read_text(encoding='utf-8')
+            self.assertIn('<main class="am-sheet', page)
+            self.assertIn('<p class="am-colophon">- 指定团队</p>', page)
+            self.assert_page_options(page)
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js is needed for the bundled renderer")
+    def test_raw_html_preserves_its_content_when_patching_another_panel(self):
+        with TemporaryDirectory() as directory:
+            workdir = Path(directory)
+            draft = workdir / 'raw.md'
+            output = workdir / 'review.html'
+            panel = workdir / 'decision.md'
+            raw = '<div id="amv-data" title="Using </body> and </html> in an attribute">Raw example</div>'
+            draft.write_text(f'## A Raw\n\n```html\n{raw}\n```\n\n## B Decision\n\nBefore.\n', encoding='utf-8')
+            panel.write_text('## B Decision\n\nUpdated.\n', encoding='utf-8')
+            cli = ('node', str(SCRIPTS / 'render_html.mjs'))
+            self.run_render(*cli, 'render', str(draft), '-o', str(output), '--footer=Review team', workdir=workdir)
+            self.assertIn(raw, output.read_text(encoding='utf-8'))
+            self.run_render(*cli, 'patch', str(output), '--panel', 'B', str(panel), workdir=workdir)
+            page = output.read_text(encoding='utf-8')
+            self.assertIn('data-theme="blueprint" data-mode="light"', page)
+            self.assertIn(raw, page)
+            self.assertIn('<p class="am-colophon">Review team</p>', page)
+            self.assertIn('Updated.', page)
+            self.assert_page_options(page)
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js is needed for the bundled renderer")
+    def test_invalid_draft_patch_and_non_html_output_preserve_the_old_page(self):
+        with TemporaryDirectory() as directory:
+            workdir = Path(directory)
+            output = workdir / 'answer.html'
+            cli = ('node', str(SCRIPTS / 'render_html.mjs'))
+            self.run_render(*cli, 'render', str(SHOWCASE), '-o', str(output), workdir=workdir)
+            original = output.read_bytes()
+            bad = workdir / 'bad.md'
+            bad.write_text('## A Broken\n```flow\nA -> B', encoding='utf-8')
+            for args in (('render', str(bad), '-o', str(output)),
+                         ('patch', str(output), '--panel', 'No such panel', '--from', str(bad)),
+                         ('render', str(SHOWCASE), '-o', str(output.with_suffix('.mp4'))),
+                         ('video', str(SHOWCASE), '-o', str(output))):
+                result = subprocess.run([*cli, *args], cwd=workdir, capture_output=True, timeout=30)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(output.read_bytes(), original)
+            self.assertFalse(output.with_suffix('.mp4').exists())
 
     def assert_project_credit(self, page: str):
         credit = page.split('<p class="am-colophon">', 1)[1].split("</p>", 1)[0]
@@ -242,7 +364,7 @@ class ProgressStateTests(unittest.TestCase):
 
     def run_render(self, *command: str, workdir: Path):
         result = subprocess.run(
-            command, cwd=workdir, env={**os.environ, "AM_HOME": str(workdir / "renderer")},
+            command, cwd=workdir, env={**os.environ, "AM_HOME": str(workdir / "renderer"), "AM_NO_UPDATE_CHECK": "1"},
             capture_output=True, encoding="utf-8", errors="replace", timeout=30,
         )
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
@@ -258,7 +380,10 @@ class ProgressStateTests(unittest.TestCase):
                 "answer_progress.subprocess.run"
             ) as run:
                 render_answer_progress(self.state, EXAMPLE, output)
-            self.assertEqual(run.call_args.args[0][1], str(custom_cli))
+            self.assertEqual(run.call_args.args[0], [
+                "node", str(custom_cli), "render", str(output.with_suffix(".view.md")),
+                "-o", str(output), "--no-open",
+            ])
 
 
 if __name__ == "__main__":

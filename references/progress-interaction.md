@@ -11,10 +11,12 @@
 说明页从 Markdown 草稿生成。需要 Node.js 20 或更新版本。以下脚本路径以已加载的 `SKILL.md` 目录为准。
 
 ```sh
-node /ABSOLUTE/SKILL/scripts/render_html.mjs render /ABSOLUTE/draft.md -o /ABSOLUTE/page.html --no-open --theme blueprint --mode light
+node /ABSOLUTE/SKILL/scripts/render_html.mjs render /ABSOLUTE/draft.md -o /ABSOLUTE/page.html --no-open
 ```
 
-用同一入口的 `help format` 查草稿格式。已有页面只改一个面板时看 `help patch`。任务快照用随包脚本渲染：
+HTML 说明页统一使用随包入口，无需另装页面 skill。默认 sheet / blueprint / light；header、字体字号、表格和自动布局沿用随包原版，只隐藏工具栏。只输出 HTML。页首字段、组件选择和署名示例见 [HTML 内容模型](html-explainer.md)。
+
+用同一入口的 `help format` 查草稿格式，`list` 列组件。已有页面只改一个面板时看 `help patch`；patch 继续隐藏工具栏并保留自定义署名。任务快照用随包脚本渲染：
 
 ```sh
 python /ABSOLUTE/SKILL/scripts/render_progress.py /ABSOLUTE/task.progress.json --output /ABSOLUTE/task.html
@@ -22,7 +24,7 @@ python /ABSOLUTE/SKILL/scripts/render_progress.py /ABSOLUTE/task.progress.json -
 
 新快照的目标模式为 `review`，阶段为 `prepare`、`review`、`human_review`。见 [状态样例](../assets/progress.example.json)。脚本兼容已有快照。记录文本证据用 `evidence`，链接另用 `evidence_href`。
 
-默认渲染器是随包的 Answer me with HTML，默认主题为浅色图纸。显式选择 `presentation.renderer: native` 时使用内置模板。既有 `presentation.am_cli` 可继续指定自定义入口。工具缺失或渲染失败时，报告缺项并保留聊天结果。
+默认渲染器为随包入口，仍接受既有的 `presentation.renderer: answer-me-with-html` 状态值。默认署名包含 code-review-lifecycle-skill 和 Star on GitHub，均链接本项目；`presentation.footer` 可指定整行文字，空字符串隐藏署名。显式选择 `presentation.renderer: native` 时使用旧内置模板；其外观不适用本说明。既有 `presentation.am_cli` 可继续指定自定义入口，自定义入口需自行支持所用参数。工具缺失或渲染失败时，报告缺项并保留聊天结果。
 
 ## 核对页面
 

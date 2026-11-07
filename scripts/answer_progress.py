@@ -61,7 +61,7 @@ def build_draft(state: dict, state_path: Path) -> str:
     if display_zone is None:
         raise ValueError("The task's display time must include a timezone")
     for key, allowed, default in (("theme", {"shadcn", "blueprint"}, "blueprint"),
-                                  ("template", {"doc", "sheet"}, "doc"),
+                                  ("template", {"doc", "sheet"}, "sheet"),
                                   ("mode", {"light", "dark", "auto"}, "light")):
         if view.get(key, default) not in allowed:
             raise ValueError(f"Unsupported presentation {key}")
@@ -70,7 +70,7 @@ def build_draft(state: dict, state_path: Path) -> str:
     tone = "err" if state["status"] == "failed" else "warn" if pending else "ok"
     issues = [item for item in state["issues"] if item["blocking"]]
     owners = "、".join(dict.fromkeys(item["owner"] for item in issues)) or state["next_step"]["owner"]
-    lines = ["---", f"template: {view.get('template', 'doc')}", f"theme: {view.get('theme', 'blueprint')}",
+    lines = ["---", f"template: {view.get('template', 'sheet')}", f"theme: {view.get('theme', 'blueprint')}",
              f"mode: {view.get('mode', 'light')}", "lang: zh", "cols: 2",
              f"title: {text(state['project'])} · 当前进度",
              f"subtitle: {PHASE_LABELS[state['phase']]} · {LABELS[state['status']]}",
@@ -169,4 +169,9 @@ def render_answer_progress(state: dict, state_path: Path, output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     draft_path = output.with_suffix(".view.md")
     draft_path.write_text(draft, encoding="utf-8")
-    subprocess.run([node, str(cli), "render", str(draft_path), "-o", str(output), "--no-open"], check=True)
+    command = [node, str(cli), "render", str(draft_path), "-o", str(output), "--no-open"]
+    if "footer" in view:
+        if not isinstance(view["footer"], str):
+            raise ValueError("presentation.footer must be text")
+        command.append(f"--footer={view['footer']}")
+    subprocess.run(command, check=True)
