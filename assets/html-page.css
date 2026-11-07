@@ -1,0 +1,2 @@
+/* 保留原版 header、字号、表格和自动布局，只隐藏工具栏。 */
+.am-toolbar { display: none; }
